@@ -391,19 +391,7 @@ def create_dashboard_app():
         })
 
     # =========================================================================
-    # Static files - serve dashboard frontend
-    # =========================================================================
-    static_dir = Path(__file__).parent / "dashboard_static"
-    if static_dir.exists():
-        app.router.add_static("/", str(static_dir), show_index=True)
-    else:
-        # Fallback route when static dir doesn't exist
-        async def index(request):
-            return web.Response(text="Dashboard static files not found", status=404)
-        app.router.add_get("/", index)
-
-    # =========================================================================
-    # Register routes
+    # Register API routes FIRST (before static catch-all)
     # =========================================================================
     app.router.add_get("/api/logs", api_logs)
     app.router.add_get("/api/logs/stream", api_log_stream)
@@ -417,6 +405,26 @@ def create_dashboard_app():
     app.router.add_get("/api/keys", api_keys)
     app.router.add_post("/api/keys", api_keys_update)
     app.router.add_get("/api/status", api_server_status)
+
+    # =========================================================================
+    # Static files - serve dashboard frontend (catch-all for non-API routes)
+    # =========================================================================
+    static_dir = Path(__file__).parent / "dashboard_static"
+    index_html = static_dir / "index.html"
+    if index_html.exists():
+        async def index_handler(request):
+            return web.FileResponse(index_html)
+        app.router.add_get("/", index_handler)
+        # Serve static files (CSS/JS/images) from /static/ prefix
+        app.router.add_static("/static", str(static_dir))
+        # Fallback: any non-API path serves index.html (SPA support)
+        async def fallback_handler(request):
+            return web.FileResponse(index_html)
+        app.router.add_get("/{tail:.*}", fallback_handler)
+    else:
+        async def index(request):
+            return web.Response(text="Dashboard static files not found", status=404)
+        app.router.add_get("/", index)
 
     return app
 
