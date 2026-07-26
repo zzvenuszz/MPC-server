@@ -19,7 +19,6 @@ from contextlib import contextmanager
 import structlog
 from structlog.stdlib import LoggerFactory
 from structlog.processors import JSONRenderer, TimeStamper, StackInfoRenderer
-from python_json_logger import base
 from logging.handlers import RotatingFileHandler
 
 from config import get_settings
