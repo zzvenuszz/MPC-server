@@ -1,3 +1,15 @@
+---
+title: MPC Server
+emoji: 💥
+colorFrom: indigo
+colorTo: gray
+sdk: docker
+sdk_version: "latest"
+python_version: "3.12"
+app_file: server.py
+pinned: false
+---
+
 # MCP Programming Support Server
 
 > MCP Server hỗ trợ lập trình, phát triển Minecraft Paper plugin và thiết kế game tu tiên (Xianxia)
@@ -493,5 +505,3 @@ MCP Programming Support Server Team
 ---
 
 **Lưu ý**: Server này được thiết kế để chạy trong Docker. Không chạy trực tiếp trên host mà không có Docker container.
-
-**đã thêm github workflow sync hugging face**
