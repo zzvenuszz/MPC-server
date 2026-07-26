@@ -257,11 +257,6 @@ class Settings(BaseSettings):
         """
         return self.log_dir / f"{name}.log"
 
-    class Config:
-        """Pydantic config"""
-        env_file = ".env"
-        env_file_encoding = "utf-8"
-
 
 # Singleton instance
 _settings: Optional[Settings] = None
