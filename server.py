@@ -4,6 +4,7 @@ MCP Server hỗ trợ lập trình với đầy đủ công cụ phát triển
 """
 
 import sys
+import threading
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -11,8 +12,8 @@ from typing import Any, Dict, List, Optional
 sys.path.insert(0, str(Path(__file__).parent))
 
 from mcp.server.fastmcp import FastMCP
-from config import get_settings, reload_settings
-from utils import get_logger, setup_logging, MCPError
+from config import get_settings
+from utils import get_logger, setup_logging
 
 # Thiết lập logging
 logger = setup_logging()
@@ -23,7 +24,6 @@ settings = get_settings()
 # Tạo FastMCP server
 mcp = FastMCP(
     name="programming-support-server",
-    version="1.0.0",
     description="MCP Server hỗ trợ lập trình, phát triển Minecraft Paper plugin và thiết kế game tu tiên"
 )
 
@@ -1143,8 +1143,49 @@ def generate_quest_chain(
 # MAIN
 # =============================================================================
 
+def _start_health_server():
+    """
+    Khởi động HTTP health server cho Hugging Face Spaces.
+    HF Spaces yêu cầu container expose port 7860 và trả về HTTP response
+    để giữ container alive.
+    """
+    import http.server
+    import socketserver
+    import json
+
+    class HealthHandler(http.server.BaseHTTPRequestHandler):
+        def do_GET(self):
+            if self.path == "/health":
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.end_headers()
+                self.wfile.write(json.dumps({
+                    "status": "ok",
+                    "service": "mcp-programming-server"
+                }).encode())
+            else:
+                self.send_response(200)
+                self.send_header("Content-Type", "text/plain")
+                self.end_headers()
+                self.wfile.write(b"MCP Programming Support Server is running")
+
+        def log_message(self, format, *args):
+            pass  # Silent logging
+
+    try:
+        with socketserver.TCPServer(("0.0.0.0", 7860), HealthHandler) as httpd:
+            httpd.serve_forever()
+    except Exception as e:
+        logger.warning("Không thể khởi động health server", error=str(e))
+
+
 if __name__ == "__main__":
     try:
+        # Khởi động HTTP health server trong background thread cho HF Spaces
+        health_thread = threading.Thread(target=_start_health_server, daemon=True)
+        health_thread.start()
+        logger.info("Health server đã khởi động trên port 7860")
+
         logger.info("Bắt đầu chạy MCP Server...")
         mcp.run()
     except KeyboardInterrupt:

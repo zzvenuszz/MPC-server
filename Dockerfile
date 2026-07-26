@@ -57,12 +57,12 @@ RUN mkdir -p /app/logs && chown -R mcpuser:mcpuser /app/logs
 # Switch to non-root user
 USER mcpuser
 
-# Expose port (nếu cần)
-EXPOSE 8000
+# Expose port cho Hugging Face Spaces
+EXPOSE 7860
 
-# Healthcheck
+# Healthcheck đơn giản - kiểm tra process còn sống
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-    CMD python -c "import sys; sys.exit(0)" || exit 1
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:7860/health', timeout=5)" || exit 1
 
 # Default command
 CMD ["python", "server.py"]
