@@ -493,3 +493,5 @@ MCP Programming Support Server Team
 ---
 
 **Lưu ý**: Server này được thiết kế để chạy trong Docker. Không chạy trực tiếp trên host mà không có Docker container.
+
+**đã thêm github workflow sync hugging face**
