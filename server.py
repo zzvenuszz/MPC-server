@@ -24,7 +24,7 @@ settings = get_settings()
 # Tạo FastMCP server
 mcp = FastMCP(
     name="programming-support-server",
-    description="MCP Server hỗ trợ lập trình, phát triển Minecraft Paper plugin và thiết kế game tu tiên"
+    instructions="MCP Server hỗ trợ lập trình, phát triển Minecraft Paper plugin và thiết kế game tu tiên"
 )
 
 # Log khởi động
