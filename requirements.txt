@@ -13,6 +13,10 @@ python-dotenv>=1.0.0
 # HTTP & Async
 httpx>=0.27.0
 aiohttp>=3.9.0
+aiohttp-cors>=0.7.0
+
+# System
+psutil>=5.9.0
 
 # Logging
 structlog>=24.0.0

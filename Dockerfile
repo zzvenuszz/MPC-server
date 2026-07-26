@@ -57,12 +57,13 @@ RUN mkdir -p /app/logs && chown -R mcpuser:mcpuser /app/logs
 # Switch to non-root user
 USER mcpuser
 
-# Expose port cho Hugging Face Spaces
+# Expose ports: 7860 cho MCP Server (SSE), 8080 cho Dashboard
 EXPOSE 7860
+EXPOSE 8080
 
-# Healthcheck đơn giản - kiểm tra process còn sống
+# Healthcheck - kiểm tra Dashboard endpoint
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:7860/health', timeout=5)" || exit 1
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8080/api/status', timeout=5)" || exit 1
 
 # Default command
 CMD ["python", "server.py"]
