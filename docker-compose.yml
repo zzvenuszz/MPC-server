@@ -1,0 +1,91 @@
+# MCP Programming Support Server - Docker Compose
+# Production-ready configuration
+
+version: '3.8'
+
+services:
+  mcp-server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: mcp-programming-server
+    restart: unless-stopped
+    
+    # Environment variables
+    environment:
+      - WORKSPACE=/data
+      - LOG_LEVEL=INFO
+      - LOG_DIR=/app/logs
+      - REQUEST_TIMEOUT=30
+      - MAX_FILE_SIZE=10485760
+      - ALLOW_SHELL=true
+      - ALLOW_WRITE=true
+      - PAPER_SERVER_PATH=/data/paper-server
+      - PAPER_API_VERSION=1.20
+      - CULTIVATION_LANGUAGE=vi
+      - CULTIVATION_DETAIL_LEVEL=high
+    
+    # Volumes
+    volumes:
+      - /data:/data
+      - ./logs:/app/logs
+      - paper-server:/data/paper-server
+    
+    # Networks
+    networks:
+      - mcp-network
+    
+    # Healthcheck
+    healthcheck:
+      test: ["CMD", "python", "-c", "import sys; sys.exit(0)"]
+      interval: 30s
+      timeout: 3s
+      start_period: 5s
+      retries: 3
+    
+    # Logging
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    
+    # Resource limits (optional)
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+
+  # Optional: Redis for caching (nếu cần)
+  # redis:
+  #   image: redis:7-alpine
+  #   container_name: mcp-redis
+  #   restart: unless-stopped
+  #   volumes:
+  #     - redis-data:/data
+  #   networks:
+  #     - mcp-network
+  #   healthcheck:
+  #     test: ["CMD", "redis-cli", "ping"]
+  #     interval: 30s
+  #     timeout: 3s
+  #     retries: 3
+
+# Volumes
+volumes:
+  workspace:
+    driver: local
+  paper-server:
+    driver: local
+  # redis-data:
+  #   driver: local
+
+# Networks
+networks:
+  mcp-network:
+    driver: bridge
+    name: mcp-programming-network

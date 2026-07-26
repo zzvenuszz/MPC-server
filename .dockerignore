@@ -1,0 +1,85 @@
+# Git
+.git
+.github
+.gitignore
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker
+Dockerfile
+docker-compose*.yml
+.dockerignore
+
+# Documentation
+*.md
+LICENSE
+docs/
+
+# Tests
+tests/
+test/
+*.test.js
+*.test.py
+*.spec.js
+*.spec.py
+
+# Development files
+*.log
+*.tmp
+.env.local
+.env.development
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.coverage
+htmlcov/
+.venv/
+venv/
+env/
+.tox/
+.eggs/
+
+# Node modules
+node_modules/
+npm-debug.log
+
+# Java
+target/
+*.class
+*.jar
+*.war
+.gradle/
+
+# Go
+vendor/
+
+# Build outputs
+dist/
+build/
+out/
+bin/
+
+# IDE specific
+*.iml
+.project
+.classpath
+.settings/
+
+# Logs
+logs/
+*.log
+
+# Workspace
+workspace/
