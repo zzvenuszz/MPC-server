@@ -293,24 +293,30 @@ def create_dashboard_app():
     # =========================================================================
     # Authentication Middleware
     # =========================================================================
-    async def auth_middleware(request, handler):
-        """Middleware kiểm tra authentication"""
-        # Skip auth cho login endpoint và static files
-        if request.path == '/api/auth/login':
+    def auth_middleware_factory(app, handler):
+        """Middleware factory kiểm tra authentication"""
+        async def auth_middleware(request):
+            # Skip auth cho login endpoint và static files
+            if request.path == '/api/auth/login':
+                return await handler(request)
+            
+            # Skip auth cho static files
+            if request.path.startswith('/static/'):
+                return await handler(request)
+            
+            # Skip auth cho MCP endpoint (cho phép Cline kết nối)
+            if request.path == '/mcp':
+                return await handler(request)
+            
+            # Kiểm tra session/cookie
+            auth_token = request.cookies.get('dashboard_auth')
+            if auth_token != 'authenticated':
+                return web.json_response({'error': 'Unauthorized'}, status=401)
+            
             return await handler(request)
-        
-        # Skip auth cho static files
-        if request.path.startswith('/static/'):
-            return await handler(request)
-        
-        # Kiểm tra session/cookie
-        auth_token = request.cookies.get('dashboard_auth')
-        if auth_token != 'authenticated':
-            return web.json_response({'error': 'Unauthorized'}, status=401)
-        
-        return await handler(request)
+        return auth_middleware
 
-    app.middlewares.append(auth_middleware)
+    app.middlewares.append(auth_middleware_factory)
 
     # =========================================================================
     # API Routes
