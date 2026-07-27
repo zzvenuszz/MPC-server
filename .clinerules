@@ -1,0 +1,55 @@
+# CLINE RULES - Quy tắc báo cáo và xử lý lỗi
+
+## 1. Quy tắc báo cáo kết quả
+
+### Khi báo cáo kết quả sau khi sửa lỗi:
+- **PHẢI** phân tích rõ nguyên nhân gốc gây lỗi
+- **PHẢI** giải thích chi tiết cách giải quyết đã áp dụng
+- **PHẢI** báo cáo kết quả cụ thể, không được dùng mẫu chung chung
+- **PHẢI** chỉ ra sự khác biệt so với lần trước (nếu có)
+- **PHẢI** liệt kê các thay đổi thực tế đã thực hiện
+
+### Cấu trúc báo cáo:
+```
+## Phân tích lỗi
+- Nguyên nhân: [mô tả chi tiết]
+- Vị trí: [file, dòng code]
+- Impact: [hậu quả]
+
+## Giải pháp áp dụng
+- Thay đổi 1: [mô tả]
+- Thay đổi 2: [mô tả]
+
+## Kết quả
+- Trước: [tình trạng cũ]
+- Sau: [tình trạng mới]
+- Cách test: [hướng dẫn kiểm tra]
+```
+
+## 2. Quy tắc xử lý lỗi
+
+### Trước khi sửa lỗi:
+- Đọc và phân tích đầy đủ stack trace
+- Xác định root cause, không chỉ symptom
+- Kiểm tra xem đã từng sửa lỗi này chưa
+
+### Khi sửa lỗi:
+- Mỗi lần sửa phải khác biệt so với lần trước
+- Không lặp lại cách tiếp cận đã thất bại
+- Nếu đã thử 2-3 cách và vẫn lỗi, cần phân tích lại hoàn toàn
+
+### Sau khi sửa lỗi:
+- Kiểm tra xem thay đổi có giải quyết đúng root cause không
+- Xác nhận không introduce lỗi mới
+- Test nếu có thể
+
+## 3. Quy tắc giao tiếp
+
+### Ngôn ngữ:
+- Sử dụng tiếng Việt khi người dùng dùng tiếng Việt
+- Rõ ràng, trực tiếp, không dùng thuật ngữ không cần thiết
+
+### Nội dung:
+- Không được sao chép báo cáo cũ
+- Mỗi lần báo cáo phải có thông tin mới, cụ thể
+- Nếu không có gì thay đổi, phải nói rõ "không có thay đổi" thay vì copy paste
