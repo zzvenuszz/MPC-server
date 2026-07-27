@@ -20,16 +20,18 @@ from dashboard import create_dashboard_app, setup_dashboard_logging, start_dashb
 # Thiết lập logging
 logger = setup_logging()
 
-# Lấy settings
+# Lấy settings TRƯỚC khi tạo FastMCP để truyền host/port đúng
 settings = get_settings()
 
-# Tạo FastMCP server
+# Tạo FastMCP server với host/port từ config
 # Import FastMCP sau các module khác để tránh circular import
 from mcp.server.fastmcp import FastMCP
 
 mcp = FastMCP(
     name="programming-support-server",
     instructions="MCP Server hỗ trợ lập trình, phát triển Minecraft Paper plugin và thiết kế game tu tiên",
+    host=settings.host,
+    port=settings.port,
 )
 
 # Log khởi động

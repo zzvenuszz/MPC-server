@@ -11,7 +11,6 @@
 - **Protocol**: JSON-RPC 2.0 over SSE
 
 ### Lưu ý quan trọng:
-- HF Spaces chỉ expose port 7860, không dùng port 8080 hay 8000
 - Server phải bind to 0.0.0.0 (không phải 127.0.0.1)
 - FastMCP đọc HOST và PORT từ environment variables
 - Cline kết nối qua URL: https://huyhoan76-cline.hf.space/sse
@@ -69,3 +68,11 @@
 - Không được sao chép báo cáo cũ
 - Mỗi lần báo cáo phải có thông tin mới, cụ thể
 - Nếu không có gì thay đổi, phải nói rõ "không có thay đổi" thay vì copy paste
+
+## 4. Quy tắc thực thi lệnh
+
+### Đợi kết quả lệnh:
+- **BẮT BUỘC** đợi output của lệnh sau khi thực thi
+- Không được skip hoặc bỏ qua kết quả lệnh
+- Nếu lệnh đang chạy (status "process while running"), phải đợi user copy output và gửi vào chat
+- Không tự ý thực thi lệnh tiếp theo nếu chưa có kết quả của lệnh trước
