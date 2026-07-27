@@ -1166,7 +1166,8 @@ if __name__ == "__main__":
         logger.info("=" * 60)
         
         # Chạy FastMCP với SSE transport - cách chuẩn và được recommend bởi FastMCP
-        mcp.run(transport="sse", host="0.0.0.0", port=port)
+        # FastMCP sẽ đọc PORT từ environment variable
+        mcp.run(transport="sse")
         
     except KeyboardInterrupt:
         logger.info("Nhận tín hiệu dừng...")
