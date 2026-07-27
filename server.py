@@ -15,7 +15,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 from mcp.server.fastmcp import FastMCP
 from config import get_settings
 from utils import get_logger, setup_logging
-from dashboard import setup_dashboard_logging, start_dashboard_thread, log_tool_call
+from dashboard import create_dashboard_app, setup_dashboard_logging, log_tool_call
 
 # Thiết lập logging
 logger = setup_logging()
@@ -23,12 +23,10 @@ logger = setup_logging()
 # Lấy settings
 settings = get_settings()
 
-# Tạo FastMCP server - host=0.0.0.0 và port=7860 cho Hugging Face Spaces
+# Tạo FastMCP server
 mcp = FastMCP(
     name="programming-support-server",
     instructions="MCP Server hỗ trợ lập trình, phát triển Minecraft Paper plugin và thiết kế game tu tiên",
-    host="0.0.0.0",
-    port=7860
 )
 
 # Log khởi động
@@ -1152,8 +1150,9 @@ if __name__ == "__main__":
         # Thiết lập dashboard logging để bắt log realtime
         setup_dashboard_logging()
 
-        # Khởi động dashboard web server trên port 8080
-        dashboard_port = int(os.environ.get("DASHBOARD_PORT", 8080))
+        # HF Spaces chỉ expose port 7860 -> Dashboard chạy trên port này
+        # FastMCP dùng transport='stdio' (mặc định) cho MCP protocol
+        dashboard_port = int(os.environ.get("DASHBOARD_PORT", 7860))
         dashboard_thread = threading.Thread(
             target=start_dashboard_thread,
             kwargs={"host": "0.0.0.0", "port": dashboard_port},
@@ -1163,10 +1162,10 @@ if __name__ == "__main__":
         dashboard_thread.start()
         logger.info("Dashboard đã khởi động trên http://0.0.0.0:%d", dashboard_port)
 
-        logger.info("Bắt đầu chạy MCP Server với transport SSE...")
-        # Dùng transport='sse' để server chạy persistent như HTTP server
-        # host và port đã được cấu hình trong FastMCP() constructor
-        mcp.run(transport='sse')
+        logger.info("Bắt đầu chạy MCP Server với transport stdio...")
+        # Dùng transport='stdio' (mặc định) - MCP client kết nối qua stdin/stdout
+        # Dashboard web UI phục vụ trên port 7860 cho HF Spaces
+        mcp.run(transport='stdio')
     except KeyboardInterrupt:
         logger.info("Nhận tín hiệu dừng...")
     except Exception as e:

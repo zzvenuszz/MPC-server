@@ -391,7 +391,7 @@ def create_dashboard_app():
         })
 
     # =========================================================================
-    # Register API routes FIRST (before static catch-all)
+    # Register routes
     # =========================================================================
     app.router.add_get("/api/logs", api_logs)
     app.router.add_get("/api/logs/stream", api_log_stream)
@@ -407,20 +407,15 @@ def create_dashboard_app():
     app.router.add_get("/api/status", api_server_status)
 
     # =========================================================================
-    # Static files - serve dashboard frontend (catch-all for non-API routes)
+    # Serve dashboard frontend
     # =========================================================================
     static_dir = Path(__file__).parent / "dashboard_static"
     index_html = static_dir / "index.html"
     if index_html.exists():
+        app.router.add_static("/dashboard_static", str(static_dir))
         async def index_handler(request):
             return web.FileResponse(index_html)
         app.router.add_get("/", index_handler)
-        # Serve static files (CSS/JS/images) from /static/ prefix
-        app.router.add_static("/static", str(static_dir))
-        # Fallback: any non-API path serves index.html (SPA support)
-        async def fallback_handler(request):
-            return web.FileResponse(index_html)
-        app.router.add_get("/{tail:.*}", fallback_handler)
     else:
         async def index(request):
             return web.Response(text="Dashboard static files not found", status=404)
