@@ -1172,6 +1172,37 @@ if __name__ == "__main__":
         logger.info("Port: %d", port)
         logger.info("=" * 60)
         
+        # Mount dashboard vào FastMCP app
+        try:
+            from starlette.routing import Route, Mount
+            from starlette.staticfiles import StaticFiles
+            from starlette.responses import FileResponse, Response
+            from pathlib import Path
+            
+            # Đường dẫn đến dashboard static files
+            static_dir = Path(__file__).parent / "dashboard_static"
+            index_html = static_dir / "index.html"
+            
+            # Dashboard routes
+            async def dashboard_index(request):
+                """Serve dashboard index.html"""
+                if index_html.exists():
+                    return FileResponse(index_html)
+                return Response(text="Dashboard not found", status_code=404)
+            
+            # Mount dashboard routes vào FastMCP app
+            # Dashboard API routes
+            dashboard_routes = [
+                Route("/", dashboard_index, methods=["GET"]),
+                Mount("/static", app=StaticFiles(directory=str(static_dir)), name="dashboard-static"),
+            ]
+            
+            mcp._app.routes.extend(dashboard_routes)
+            logger.info("Dashboard đã được mount vào MCP Server tại /")
+            
+        except Exception as e:
+            logger.warning("Không thể mount dashboard: %s", str(e))
+        
         # Chạy FastMCP với SSE transport
         # FastMCP sẽ đọc env vars đã set ở đầu file
         # Nếu FastMCP không đọc PORT env var, sử dụng uvicorn trực tiếp
