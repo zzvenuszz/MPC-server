@@ -474,7 +474,7 @@ curl -N https://huyhoan76-cline.hf.space/sse
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `PORT` | `7860` | Port cho MCP Server (HF Spaces: 7860, 8080, hoặc 3000) |
+| `PORT` | `8080` | Port cho MCP Server (HF Spaces: 8080) |
 | `WORKSPACE` | `/workspace` | Thư mục làm việc chính |
 | `LOG_LEVEL` | `INFO` | Mức log: DEBUG, INFO, WARNING, ERROR |
 | `REQUEST_TIMEOUT` | `30` | HTTP request timeout (giây) |

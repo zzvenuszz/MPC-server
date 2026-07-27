@@ -207,6 +207,24 @@ class Settings(BaseSettings):
     )
 
     # =============================================================================
+    # SERVER CONFIGURATION
+    # =============================================================================
+
+    # Server host
+    host: str = Field(
+        default="0.0.0.0",
+        description="Server host (HF Spaces cần 0.0.0.0)"
+    )
+
+    # Server port
+    port: int = Field(
+        default=8080,
+        ge=1,
+        le=65535,
+        description="Server port (HF Spaces dùng 8080)"
+    )
+
+    # =============================================================================
     # COMPUTED PROPERTIES
     # =============================================================================
 

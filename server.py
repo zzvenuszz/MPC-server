@@ -1153,8 +1153,10 @@ if __name__ == "__main__":
         # Thiết lập dashboard logging để bắt log realtime
         setup_dashboard_logging()
 
-        # HF Spaces expose port 8080 (đã cấu hình trong README.md app_port: 8080)
-        port = int(os.environ.get("PORT", 8080))
+        # Đọc cấu hình server từ config (đồng bộ với config.py)
+        settings = get_settings()
+        host = settings.host
+        port = settings.port
         
         # Chạy MCP server với SSE transport - đây là cách chuẩn theo MCP protocol
         # FastMCP sẽ tự động expose endpoint /sse cho Cline kết nối
@@ -1164,6 +1166,7 @@ if __name__ == "__main__":
         logger.info("Endpoint: https://huyhoan76-cline.hf.space/sse")
         logger.info("Transport: SSE (Server-Sent Events)")
         logger.info("Protocol: JSON-RPC 2.0 over SSE")
+        logger.info("Host: %s", host)
         logger.info("Port: %d", port)
         logger.info("=" * 60)
         
@@ -1174,13 +1177,13 @@ if __name__ == "__main__":
             mcp.run(transport="sse")
         except Exception as e:
             logger.warning("FastMCP.run() failed: %s", str(e))
-            logger.info("Sử dụng uvicorn trực tiếp với port %d...", port)
+            logger.info("Sử dụng uvicorn trực tiếp với %s:%d...", host, port)
             
             # Import uvicorn và chạy trực tiếp
             import uvicorn
             uvicorn.run(
                 mcp._app,
-                host="0.0.0.0",
+                host=host,
                 port=port,
                 log_level="info"
             )

@@ -571,8 +571,20 @@ def _start_dashboard(host: str = "0.0.0.0", port: int = 8080):
         loop.close()
 
 
-def start_dashboard_thread(host: str = "0.0.0.0", port: int = 8080):
+def start_dashboard_thread(host: str = None, port: int = None):
     """Khởi động dashboard trong background thread"""
+    # Đọc cấu hình từ config nếu không được truyền vào
+    if host is None or port is None:
+        try:
+            from config import get_settings
+            settings = get_settings()
+            host = host or settings.host
+            port = port or settings.port
+        except Exception:
+            # Fallback to defaults nếu không đọc được config
+            host = host or "0.0.0.0"
+            port = port or 8080
+
     thread = threading.Thread(
         target=_start_dashboard,
         args=(host, port),
