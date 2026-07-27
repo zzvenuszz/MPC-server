@@ -210,6 +210,87 @@ def create_dashboard_app():
     app = web.Application()
 
     # =========================================================================
+    # MCP HTTP Bridge - Cho phép Cline kết nối qua HTTP
+    # =========================================================================
+    async def mcp_http_handler(request):
+        """HTTP endpoint cho MCP server - cho phép Cline kết nối từ xa"""
+        try:
+            # Đọc request body
+            data = await request.json()
+            
+            # Import MCP server
+            from server import mcp as mcp_server
+            
+            # Xử lý MCP message
+            method = data.get('method', '')
+            params = data.get('params', {})
+            request_id = data.get('id')
+            
+            result = None
+            error = None
+            
+            try:
+                # Xử lý các MCP methods
+                if method == 'initialize':
+                    result = {
+                        'protocolVersion': '2024-11-05',
+                        'capabilities': {
+                            'tools': {}
+                        },
+                        'serverInfo': {
+                            'name': 'programming-support-server',
+                            'version': '1.0.0'
+                        }
+                    }
+                elif method == 'tools/list':
+                    tools_list = []
+                    for tool in mcp_server._tool_manager.list_tools():
+                        tools_list.append({
+                            'name': tool.name,
+                            'description': tool.description or '',
+                            'inputSchema': tool.input_schema if hasattr(tool, 'input_schema') else {}
+                        })
+                    result = {'tools': tools_list}
+                elif method == 'tools/call':
+                    tool_name = params.get('name')
+                    arguments = params.get('arguments', {})
+                    
+                    # Gọi tool
+                    import asyncio
+                    loop = asyncio.get_event_loop()
+                    tool_result = await loop.run_in_executor(
+                        None,
+                        lambda: mcp_server._tool_manager.call_tool(tool_name, arguments)
+                    )
+                    
+                    result = {
+                        'content': [{'type': 'text', 'text': str(tool_result)}]
+                    }
+                else:
+                    error = {'code': -32601, 'message': f'Method not found: {method}'}
+            except Exception as e:
+                error = {'code': -32603, 'message': f'Internal error: {str(e)}'}
+            
+            # Trả về response
+            response_data = {}
+            if error:
+                response_data['error'] = error
+            if result is not None:
+                response_data['result'] = result
+            if request_id is not None:
+                response_data['id'] = request_id
+            
+            return web.json_response(response_data)
+            
+        except Exception as e:
+            return web.json_response({
+                'error': {'code': -32700, 'message': f'Parse error: {str(e)}'}
+            }, status=400)
+
+    app.router.add_post('/mcp', mcp_http_handler)
+    app.router.add_get('/mcp', mcp_http_handler)  # Also accept GET for SSE
+
+    # =========================================================================
     # Authentication Middleware
     # =========================================================================
     async def auth_middleware(request, handler):

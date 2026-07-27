@@ -1162,16 +1162,31 @@ if __name__ == "__main__":
         dashboard_thread.start()
         logger.info("Dashboard đã khởi động trên http://0.0.0.0:%d", dashboard_port)
 
-        # Chạy MCP server trong thread riêng vì stdio transport sẽ block
-        # và không có client kết nối thì nó sẽ thoát ngay
-        mcp_thread = threading.Thread(
-            target=mcp.run,
-            kwargs={"transport": "stdio"},
-            daemon=True,
-            name="mcp-server"
-        )
-        mcp_thread.start()
-        logger.info("Bắt đầu chạy MCP Server với transport stdio...")
+        # Chạy MCP server với SSE transport để Cline có thể kết nối từ xa
+        # SSE transport sẽ chạy trên port 7860 (cùng với dashboard)
+        try:
+            # Thử chạy với SSE transport nếu FastMCP hỗ trợ
+            mcp.run(transport="sse", port=7860)
+        except (ValueError, NotImplementedError):
+            # Fallback: chạy stdio transport trong thread
+            logger.info("SSE transport không khả dụng, sử dụng stdio transport...")
+            mcp_thread = threading.Thread(
+                target=mcp.run,
+                kwargs={"transport": "stdio"},
+                daemon=True,
+                name="mcp-server"
+            )
+            mcp_thread.start()
+            logger.info("Bắt đầu chạy MCP Server với transport stdio...")
+            
+            # Thông tin kết nối cho Cline
+            logger.info("=" * 60)
+            logger.info("MCP Server Configuration for Cline:")
+            logger.info("Endpoint: https://huyhoan76-cline.hf.space/")
+            logger.info("Transport: SSE (Server-Sent Events)")
+            logger.info("Path: /mcp")
+            logger.info("NOTE: Server đang chạy stdio mode. Cần cấu hình lại để hỗ trợ SSE.")
+            logger.info("=" * 60)
 
         # Giữ main thread sống để dashboard và mcp server chạy tiếp
         logger.info("Server đã sẵn sàng. Nhấn Ctrl+C để dừng.")
