@@ -166,6 +166,23 @@ ALLOW_WRITE=true
 
 ## ⚙️ Cấu hình Cline
 
+### Cấu hình cho Hugging Face Spaces (Remote SSE)
+
+Nếu server chạy trên Hugging Face Spaces (remote), sử dụng cấu hình SSE:
+
+```json
+{
+  "mcpServers": {
+    "programming-support": {
+      "url": "https://huyhoan76-cline.hf.space/sse",
+      "transport": "sse"
+    }
+  }
+}
+```
+
+### Cấu hình cho Docker Local
+
 Thêm vào Cline MCP settings (`cline_mcp_settings.json`):
 
 ```json
@@ -191,7 +208,7 @@ Thêm vào Cline MCP settings (`cline_mcp_settings.json`):
 }
 ```
 
-Hoặc nếu chạy local:
+### Cấu hình cho Local (không Docker)
 
 ```json
 {
@@ -238,6 +255,8 @@ Thêm vào Claude Desktop config:
   }
 }
 ```
+
+**Lưu ý**: Claude Desktop hiện tại chủ yếu hỗ trợ stdio transport. Để sử dụng SSE transport, cần cấu hình khác.
 
 ## 📚 Ví dụ Tool Call
 
@@ -427,8 +446,27 @@ export PYTHONPATH=/path/to/mcp-programming-server:$PYTHONPATH
 # Test server manually
 python server.py
 
-# Check MCP settings
-cat ~/.codeoss/data/User/globalStorage/saoudrizwan.claude-dev/settings/cline_mcp_settings.json
+# Check logs
+tail -f logs/mcp-server.log
+
+# Verify SSE endpoint is accessible
+curl -N https://huyhoan76-cline.hf.space/sse
+```
+
+**Problem**: SSE connection fails với lỗi 400
+
+```bash
+# Đảm bảo server đang chạy với SSE transport
+# Check logs để xem endpoint đúng
+# FastMCP SSE endpoint mặc định là /sse
+```
+
+**Problem**: Parse error khi kết nối
+
+```bash
+# Lỗi này xảy ra khi client gửi request đến endpoint sai
+# Đảm bảo endpoint là /sse (không phải /mcp)
+# SSE transport sử dụng JSON-RPC 2.0 protocol
 ```
 
 ## 📝 Environment Variables

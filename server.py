@@ -1151,51 +1151,25 @@ if __name__ == "__main__":
         # Thiết lập dashboard logging để bắt log realtime
         setup_dashboard_logging()
 
-        # HF Spaces chỉ expose port 7860 -> Dashboard chạy trên port này
-        dashboard_port = int(os.environ.get("DASHBOARD_PORT", 7860))
-        dashboard_thread = threading.Thread(
-            target=start_dashboard_thread,
-            kwargs={"host": "0.0.0.0", "port": dashboard_port},
-            daemon=True,
-            name="dashboard"
-        )
-        dashboard_thread.start()
-        logger.info("Dashboard đã khởi động trên http://0.0.0.0:%d", dashboard_port)
-
-        # Chạy MCP server với SSE transport để Cline có thể kết nối từ xa
-        # SSE transport sẽ chạy trên port 7860 (cùng với dashboard)
-        try:
-            # Thử chạy với SSE transport nếu FastMCP hỗ trợ
-            mcp.run(transport="sse")
-        except (ValueError, NotImplementedError, TypeError) as e:
-            # Fallback: chạy stdio transport trong thread
-            logger.info(f"SSE transport không khả dụng ({e}), sử dụng stdio transport...")
-            mcp_thread = threading.Thread(
-                target=mcp.run,
-                kwargs={"transport": "stdio"},
-                daemon=True,
-                name="mcp-server"
-            )
-            mcp_thread.start()
-            logger.info("Bắt đầu chạy MCP Server với transport stdio...")
-            
-            # Thông tin kết nối cho Cline
-            logger.info("=" * 60)
-            logger.info("MCP Server Configuration for Cline:")
-            logger.info("Endpoint: https://huyhoan76-cline.hf.space/")
-            logger.info("Transport: HTTP (via /mcp endpoint)")
-            logger.info("Path: /mcp")
-            logger.info("NOTE: Server đang chạy stdio mode với HTTP bridge.")
-            logger.info("Cline có thể kết nối qua HTTP endpoint.")
-            logger.info("=" * 60)
-
-        # Giữ main thread sống để dashboard và mcp server chạy tiếp
-        logger.info("Server đã sẵn sàng. Nhấn Ctrl+C để dừng.")
-        try:
-            while True:
-                time.sleep(1)
-        except KeyboardInterrupt:
-            logger.info("Nhận tín hiệu dừng...")
+        # HF Spaces chỉ expose port 7860
+        port = int(os.environ.get("PORT", 7860))
+        
+        # Chạy MCP server với SSE transport - đây là cách chuẩn theo MCP protocol
+        # FastMCP sẽ tự động expose endpoint /sse cho Cline kết nối
+        logger.info("Khởi động MCP Server với SSE transport...")
+        logger.info("=" * 60)
+        logger.info("MCP Server Configuration for Cline:")
+        logger.info("Endpoint: https://huyhoan76-cline.hf.space/sse")
+        logger.info("Transport: SSE (Server-Sent Events)")
+        logger.info("Protocol: JSON-RPC 2.0 over SSE")
+        logger.info("Port: %d", port)
+        logger.info("=" * 60)
+        
+        # Chạy FastMCP với SSE transport - cách chuẩn và được recommend bởi FastMCP
+        mcp.run(transport="sse", host="0.0.0.0", port=port)
+        
+    except KeyboardInterrupt:
+        logger.info("Nhận tín hiệu dừng...")
     except Exception as e:
         logger.error("Lỗi khởi chạy server", error=str(e), exc_info=True)
         sys.exit(1)
