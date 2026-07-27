@@ -8,6 +8,7 @@ sdk_version: "latest"
 python_version: "3.12"
 app_file: server.py
 pinned: false
+app_port: 8080
 ---
 
 # MCP Programming Support Server

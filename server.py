@@ -7,7 +7,6 @@ import sys
 import os
 import time
 import threading
-import subprocess
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -1154,8 +1153,8 @@ if __name__ == "__main__":
         # Thiết lập dashboard logging để bắt log realtime
         setup_dashboard_logging()
 
-        # HF Spaces chỉ expose port 7860
-        port = int(os.environ.get("PORT", 7860))
+        # HF Spaces expose port 8080 (đã cấu hình trong README.md app_port: 8080)
+        port = int(os.environ.get("PORT", 8080))
         
         # Chạy MCP server với SSE transport - đây là cách chuẩn theo MCP protocol
         # FastMCP sẽ tự động expose endpoint /sse cho Cline kết nối
@@ -1168,65 +1167,26 @@ if __name__ == "__main__":
         logger.info("Port: %d", port)
         logger.info("=" * 60)
         
-        # Sử dụng subprocess để đảm bảo environment variables được set đúng cách
-        # FastMCP/Uvicorn đọc env vars lúc import time, nên cần process mới
-        logger.info("Khởi động server qua subprocess với PORT=%d...", port)
-        
-        # Tạo environment cho subprocess
-        env = os.environ.copy()
-        env["PORT"] = str(port)
-        env["HOST"] = "0.0.0.0"
-        
-        # Chạy lại chính script này trong subprocess
-        # Lần này env vars đã được set đúng
-        result = subprocess.run(
-            [sys.executable, __file__, "--sse-mode"],
-            env=env,
-            cwd=str(Path(__file__).parent)
-        )
-        
-        if result.returncode != 0:
-            logger.error("Server subprocess thoát với code %d", result.returncode)
-            sys.exit(result.returncode)
+        # Chạy FastMCP với SSE transport
+        # FastMCP sẽ đọc env vars đã set ở đầu file
+        # Nếu FastMCP không đọc PORT env var, sử dụng uvicorn trực tiếp
+        try:
+            mcp.run(transport="sse")
+        except Exception as e:
+            logger.warning("FastMCP.run() failed: %s", str(e))
+            logger.info("Sử dụng uvicorn trực tiếp với port %d...", port)
+            
+            # Import uvicorn và chạy trực tiếp
+            import uvicorn
+            uvicorn.run(
+                mcp._app,
+                host="0.0.0.0",
+                port=port,
+                log_level="info"
+            )
         
     except KeyboardInterrupt:
         logger.info("Nhận tín hiệu dừng...")
     except Exception as e:
         logger.error("Lỗi khởi chạy server", error=str(e), exc_info=True)
         sys.exit(1)
-
-
-# =============================================================================
-# SSE MODE - Chạy trong subprocess với env vars đã set
-# =============================================================================
-
-def run_sse_server():
-    """Chạy FastMCP với SSE transport - được gọi từ subprocess"""
-    try:
-        # Thiết lập dashboard logging
-        setup_dashboard_logging()
-        
-        port = int(os.environ.get("PORT", 7860))
-        
-        logger.info("=" * 60)
-        logger.info("SSE Server Mode")
-        logger.info("Port: %d", port)
-        logger.info("HOST: %s", os.environ.get("HOST", "0.0.0.0"))
-        logger.info("=" * 60)
-        
-        # Chạy FastMCP với SSE transport
-        # FastMCP sẽ đọc env vars đã được set
-        mcp.run(transport="sse")
-        
-    except KeyboardInterrupt:
-        logger.info("Nhận tín hiệu dừng...")
-    except Exception as e:
-        logger.error("Lỗi trong SSE server", error=str(e), exc_info=True)
-        sys.exit(1)
-
-
-# Xử lý command line args
-if len(sys.argv) > 1 and sys.argv[1] == "--sse-mode":
-    # Chạy trong SSE mode (subprocess)
-    run_sse_server()
-    sys.exit(0)
