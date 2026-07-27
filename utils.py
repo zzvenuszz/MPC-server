@@ -49,6 +49,12 @@ def setup_logging() -> structlog.BoundLogger:
     # Tạo thư mục log nếu chưa tồn tại
     settings.ensure_log_dir_exists()
 
+    # Kiểm tra nếu logging đã được cấu hình (tránh cấu hình lại do circular import)
+    root_logger = logging.getLogger()
+    if root_logger.handlers:
+        # Đã có handlers, trả về logger hiện tại
+        return structlog.get_logger("mcp-server")
+
     # Cấu hình structlog
     structlog.configure(
         processors=[

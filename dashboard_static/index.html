@@ -429,6 +429,12 @@
         /* ============================================================
            TOOLS TABLE
            ============================================================ */
+        .tools-container {
+            max-height: calc(100vh - 200px);
+            overflow-y: auto;
+            padding-right: 8px;
+        }
+
         .tools-grid {
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
@@ -939,7 +945,9 @@
                             <div class="card-subtitle">Bật/tắt tools, test tools</div>
                         </div>
                     </div>
-                    <div class="tools-grid" id="tools-grid"></div>
+                    <div class="tools-container">
+                        <div class="tools-grid" id="tools-grid"></div>
+                    </div>
                 </div>
             </div>
 

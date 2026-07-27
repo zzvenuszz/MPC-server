@@ -177,12 +177,21 @@ _tool_registry = ToolRegistry()
 # Dashboard Web Server
 # =============================================================================
 
+# Cache for mcp instance to avoid circular import
+_mcp_instance = None
+
+
 def _get_tools_list():
     """Lấy danh sách tools từ FastMCP server"""
+    global _mcp_instance
     try:
-        from server import mcp
+        # Lazy import to avoid circular dependency
+        if _mcp_instance is None:
+            from server import mcp
+            _mcp_instance = mcp
+        
         tools = []
-        for tool in mcp._tool_manager.list_tools():
+        for tool in _mcp_instance._tool_manager.list_tools():
             tools.append({
                 "name": tool.name,
                 "description": tool.description or "",
