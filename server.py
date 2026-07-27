@@ -1197,29 +1197,22 @@ if __name__ == "__main__":
                 Mount("/static", app=StaticFiles(directory=str(static_dir)), name="dashboard-static"),
             ]
             
-            mcp._app.routes.extend(dashboard_routes)
+            app = mcp.sse_app()
+            app.routes.extend(dashboard_routes)
             logger.info("Dashboard đã được mount vào MCP Server tại /")
             
         except Exception as e:
             logger.warning("Không thể mount dashboard: %s", str(e))
         
-        # Chạy FastMCP với SSE transport
-        # FastMCP sẽ đọc env vars đã set ở đầu file
-        # Nếu FastMCP không đọc PORT env var, sử dụng uvicorn trực tiếp
-        try:
-            mcp.run(transport="sse")
-        except Exception as e:
-            logger.warning("FastMCP.run() failed: %s", str(e))
-            logger.info("Sử dụng uvicorn trực tiếp với %s:%d...", host, port)
-            
-            # Import uvicorn và chạy trực tiếp
-            import uvicorn
-            uvicorn.run(
-                mcp._app,
-                host=host,
-                port=port,
-                log_level="info"
-            )
+        # Chạy uvicorn trực tiếp với app đã được mount dashboard
+        # Không dùng mcp.run() vì nó sẽ tạo app mới, bỏ qua dashboard routes
+        import uvicorn
+        uvicorn.run(
+            app,
+            host=host,
+            port=port,
+            log_level="info"
+        )
         
     except KeyboardInterrupt:
         logger.info("Nhận tín hiệu dừng...")
