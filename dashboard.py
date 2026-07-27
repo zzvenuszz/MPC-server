@@ -412,7 +412,8 @@ def create_dashboard_app():
     static_dir = Path(__file__).parent / "dashboard_static"
     index_html = static_dir / "index.html"
     if index_html.exists():
-        app.router.add_static("/dashboard_static", str(static_dir))
+        # Serve static files (CSS/JS) từ /static/ prefix
+        app.router.add_static("/static", str(static_dir))
         async def index_handler(request):
             return web.FileResponse(index_html)
         app.router.add_get("/", index_handler)

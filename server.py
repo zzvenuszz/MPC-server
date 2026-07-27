@@ -1151,7 +1151,6 @@ if __name__ == "__main__":
         setup_dashboard_logging()
 
         # HF Spaces chỉ expose port 7860 -> Dashboard chạy trên port này
-        # FastMCP dùng transport='stdio' (mặc định) cho MCP protocol
         dashboard_port = int(os.environ.get("DASHBOARD_PORT", 7860))
         dashboard_thread = threading.Thread(
             target=start_dashboard_thread,
@@ -1162,12 +1161,24 @@ if __name__ == "__main__":
         dashboard_thread.start()
         logger.info("Dashboard đã khởi động trên http://0.0.0.0:%d", dashboard_port)
 
+        # Chạy MCP server trong thread riêng vì stdio transport sẽ block
+        # và không có client kết nối thì nó sẽ thoát ngay
+        mcp_thread = threading.Thread(
+            target=mcp.run,
+            kwargs={"transport": "stdio"},
+            daemon=True,
+            name="mcp-server"
+        )
+        mcp_thread.start()
         logger.info("Bắt đầu chạy MCP Server với transport stdio...")
-        # Dùng transport='stdio' (mặc định) - MCP client kết nối qua stdin/stdout
-        # Dashboard web UI phục vụ trên port 7860 cho HF Spaces
-        mcp.run(transport='stdio')
-    except KeyboardInterrupt:
-        logger.info("Nhận tín hiệu dừng...")
+
+        # Giữ main thread sống để dashboard và mcp server chạy tiếp
+        logger.info("Server đã sẵn sàng. Nhấn Ctrl+C để dừng.")
+        try:
+            while True:
+                time.sleep(1)
+        except KeyboardInterrupt:
+            logger.info("Nhận tín hiệu dừng...")
     except Exception as e:
         logger.error("Lỗi khởi chạy server", error=str(e), exc_info=True)
         sys.exit(1)
