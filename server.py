@@ -15,7 +15,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 from mcp.server.fastmcp import FastMCP
 from config import get_settings
 from utils import get_logger, setup_logging
-from dashboard import create_dashboard_app, setup_dashboard_logging, log_tool_call
+from dashboard import create_dashboard_app, setup_dashboard_logging, start_dashboard_thread, log_tool_call
 
 # Thiết lập logging
 logger = setup_logging()
