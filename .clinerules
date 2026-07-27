@@ -1,5 +1,21 @@
 # CLINE RULES - Quy tắc báo cáo và xử lý lỗi
 
+## 0. Thông tin môi trường
+
+### Môi trường hiện tại:
+- **Platform**: Hugging Face Spaces
+- **Public Address**: https://huyhoan76-cline.hf.space/
+- **Port**: 7860 (HF Spaces chỉ expose port này)
+- **Transport**: SSE (Server-Sent Events)
+- **MCP Endpoint**: https://huyhoan76-cline.hf.space/sse
+- **Protocol**: JSON-RPC 2.0 over SSE
+
+### Lưu ý quan trọng:
+- HF Spaces chỉ expose port 7860, không dùng port 8080 hay 8000
+- Server phải bind to 0.0.0.0 (không phải 127.0.0.1)
+- FastMCP đọc HOST và PORT từ environment variables
+- Cline kết nối qua URL: https://huyhoan76-cline.hf.space/sse
+
 ## 1. Quy tắc báo cáo kết quả
 
 ### Khi báo cáo kết quả sau khi sửa lỗi:

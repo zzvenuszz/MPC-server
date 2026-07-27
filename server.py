@@ -7,13 +7,13 @@ import sys
 import os
 import time
 import threading
+import subprocess
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 # Thêm thư mục gốc vào path
 sys.path.insert(0, str(Path(__file__).parent))
 
-from mcp.server.fastmcp import FastMCP
 from config import get_settings
 from utils import get_logger, setup_logging
 from dashboard import create_dashboard_app, setup_dashboard_logging, start_dashboard_thread, log_tool_call
@@ -25,6 +25,9 @@ logger = setup_logging()
 settings = get_settings()
 
 # Tạo FastMCP server
+# Import FastMCP sau các module khác để tránh circular import
+from mcp.server.fastmcp import FastMCP
+
 mcp = FastMCP(
     name="programming-support-server",
     instructions="MCP Server hỗ trợ lập trình, phát triển Minecraft Paper plugin và thiết kế game tu tiên",
@@ -1165,12 +1168,65 @@ if __name__ == "__main__":
         logger.info("Port: %d", port)
         logger.info("=" * 60)
         
-        # Chạy FastMCP với SSE transport - cách chuẩn và được recommend bởi FastMCP
-        # FastMCP sẽ đọc PORT từ environment variable
-        mcp.run(transport="sse")
+        # Sử dụng subprocess để đảm bảo environment variables được set đúng cách
+        # FastMCP/Uvicorn đọc env vars lúc import time, nên cần process mới
+        logger.info("Khởi động server qua subprocess với PORT=%d...", port)
+        
+        # Tạo environment cho subprocess
+        env = os.environ.copy()
+        env["PORT"] = str(port)
+        env["HOST"] = "0.0.0.0"
+        
+        # Chạy lại chính script này trong subprocess
+        # Lần này env vars đã được set đúng
+        result = subprocess.run(
+            [sys.executable, __file__, "--sse-mode"],
+            env=env,
+            cwd=str(Path(__file__).parent)
+        )
+        
+        if result.returncode != 0:
+            logger.error("Server subprocess thoát với code %d", result.returncode)
+            sys.exit(result.returncode)
         
     except KeyboardInterrupt:
         logger.info("Nhận tín hiệu dừng...")
     except Exception as e:
         logger.error("Lỗi khởi chạy server", error=str(e), exc_info=True)
         sys.exit(1)
+
+
+# =============================================================================
+# SSE MODE - Chạy trong subprocess với env vars đã set
+# =============================================================================
+
+def run_sse_server():
+    """Chạy FastMCP với SSE transport - được gọi từ subprocess"""
+    try:
+        # Thiết lập dashboard logging
+        setup_dashboard_logging()
+        
+        port = int(os.environ.get("PORT", 7860))
+        
+        logger.info("=" * 60)
+        logger.info("SSE Server Mode")
+        logger.info("Port: %d", port)
+        logger.info("HOST: %s", os.environ.get("HOST", "0.0.0.0"))
+        logger.info("=" * 60)
+        
+        # Chạy FastMCP với SSE transport
+        # FastMCP sẽ đọc env vars đã được set
+        mcp.run(transport="sse")
+        
+    except KeyboardInterrupt:
+        logger.info("Nhận tín hiệu dừng...")
+    except Exception as e:
+        logger.error("Lỗi trong SSE server", error=str(e), exc_info=True)
+        sys.exit(1)
+
+
+# Xử lý command line args
+if len(sys.argv) > 1 and sys.argv[1] == "--sse-mode":
+    # Chạy trong SSE mode (subprocess)
+    run_sse_server()
+    sys.exit(0)
