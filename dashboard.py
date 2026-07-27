@@ -436,7 +436,24 @@ def _start_dashboard(host: str = "0.0.0.0", port: int = 8080):
     logger = logging.getLogger("mcp-server")
     logger.info(f"Dashboard đang khởi động trên http://{host}:{port}")
 
-    web.run_app(app, host=host, port=port, print=lambda *a: None)
+    # Tạo event loop mới cho thread này (không dùng web.run_app vì nó dùng signal handlers)
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+
+    runner = web.AppRunner(app, handle_signals=False)
+    loop.run_until_complete(runner.setup())
+
+    site = web.TCPSite(runner, host, port)
+    loop.run_until_complete(site.start())
+
+    logger.info(f"Dashboard đã khởi động trên http://{host}:{port}")
+    try:
+        loop.run_forever()
+    except KeyboardInterrupt:
+        pass
+    finally:
+        loop.run_until_complete(runner.cleanup())
+        loop.close()
 
 
 def start_dashboard_thread(host: str = "0.0.0.0", port: int = 8080):
