@@ -1166,10 +1166,10 @@ if __name__ == "__main__":
         # SSE transport sẽ chạy trên port 7860 (cùng với dashboard)
         try:
             # Thử chạy với SSE transport nếu FastMCP hỗ trợ
-            mcp.run(transport="sse", port=7860)
-        except (ValueError, NotImplementedError):
+            mcp.run(transport="sse")
+        except (ValueError, NotImplementedError, TypeError) as e:
             # Fallback: chạy stdio transport trong thread
-            logger.info("SSE transport không khả dụng, sử dụng stdio transport...")
+            logger.info(f"SSE transport không khả dụng ({e}), sử dụng stdio transport...")
             mcp_thread = threading.Thread(
                 target=mcp.run,
                 kwargs={"transport": "stdio"},
@@ -1183,9 +1183,10 @@ if __name__ == "__main__":
             logger.info("=" * 60)
             logger.info("MCP Server Configuration for Cline:")
             logger.info("Endpoint: https://huyhoan76-cline.hf.space/")
-            logger.info("Transport: SSE (Server-Sent Events)")
+            logger.info("Transport: HTTP (via /mcp endpoint)")
             logger.info("Path: /mcp")
-            logger.info("NOTE: Server đang chạy stdio mode. Cần cấu hình lại để hỗ trợ SSE.")
+            logger.info("NOTE: Server đang chạy stdio mode với HTTP bridge.")
+            logger.info("Cline có thể kết nối qua HTTP endpoint.")
             logger.info("=" * 60)
 
         # Giữ main thread sống để dashboard và mcp server chạy tiếp
