@@ -736,6 +736,60 @@
         }
 
         /* ============================================================
+           LOGIN SCREEN
+           ============================================================ */
+        .login-overlay {
+            position: fixed;
+            inset: 0;
+            background: var(--bg-primary);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+        }
+
+        .login-overlay.hidden {
+            display: none;
+        }
+
+        .login-box {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius);
+            padding: 40px;
+            width: 400px;
+            max-width: 90vw;
+            box-shadow: var(--shadow);
+        }
+
+        .login-header {
+            text-align: center;
+            margin-bottom: 24px;
+        }
+
+        .login-header .logo {
+            width: 48px;
+            height: 48px;
+            background: var(--accent);
+            border-radius: 12px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            margin-bottom: 12px;
+        }
+
+        .login-header h1 {
+            font-size: 20px;
+            margin-bottom: 4px;
+        }
+
+        .login-header p {
+            font-size: 12px;
+            color: var(--text-muted);
+        }
+
+        /* ============================================================
            CHARTS (simple CSS bars)
            ============================================================ */
         .bar-chart {
@@ -828,6 +882,27 @@
             </div>
         </div>
     </aside>
+
+    <!-- ============================================================
+    LOGIN SCREEN
+    ============================================================ -->
+    <div class="login-overlay" id="login-overlay">
+        <div class="login-box">
+            <div class="login-header">
+                <span class="logo">⚡</span>
+                <h1>MCP Server</h1>
+                <p>Programming Support Server</p>
+            </div>
+            <form id="login-form" onsubmit="handleLogin(event)">
+                <div class="form-group">
+                    <label>Password</label>
+                    <input type="password" id="login-password" placeholder="Enter password" autofocus>
+                </div>
+                <button type="submit" class="btn btn-primary" style="width:100%;">🔐 Login</button>
+                <p id="login-error" style="color:var(--error);font-size:12px;margin-top:8px;display:none;"></p>
+            </form>
+        </div>
+    </div>
 
     <!-- ============================================================
     MAIN CONTENT
@@ -1559,16 +1634,75 @@
         }
 
         // ============================================================
+        // AUTHENTICATION
+        // ============================================================
+        async function handleLogin(event) {
+            event.preventDefault();
+            const password = document.getElementById('login-password').value;
+            const errorEl = document.getElementById('login-error');
+
+            try {
+                const res = await fetch('/api/auth/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ password })
+                });
+
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data.status === 'ok') {
+                        // Set both localStorage and cookie for compatibility
+                        localStorage.setItem('dashboard_auth', 'true');
+                        document.cookie = 'dashboard_auth=authenticated; max-age=86400; path=/';
+                        document.getElementById('login-overlay').classList.add('hidden');
+                        errorEl.style.display = 'none';
+                        
+                        // Load dashboard data after successful login
+                        await loadOverview();
+                        connectLogStream();
+                        connectToolStream();
+                    }
+                } else {
+                    const data = await res.json();
+                    errorEl.textContent = data.error || 'Invalid password';
+                    errorEl.style.display = 'block';
+                }
+            } catch (e) {
+                errorEl.textContent = 'Login failed';
+                errorEl.style.display = 'block';
+            }
+        }
+
+        function checkAuth() {
+            // Check both cookie and localStorage
+            const authCookie = document.cookie.split(';').some(c => c.trim().startsWith('dashboard_auth=authenticated'));
+            const authLocal = localStorage.getItem('dashboard_auth');
+            
+            if (authCookie || authLocal === 'true') {
+                document.getElementById('login-overlay').classList.add('hidden');
+                return true;
+            } else {
+                document.getElementById('login-overlay').classList.remove('hidden');
+                return false;
+            }
+        }
+
+        // ============================================================
         // INIT
         // ============================================================
         async function init() {
-            // Load overview first
-            await loadOverview();
-            // Connect WebSockets
-            connectLogStream();
-            connectToolStream();
-            // Periodic refresh
-            setInterval(loadOverview, 10000);
+            // Check authentication first
+            const isAuth = checkAuth();
+            
+            if (isAuth) {
+                // Load overview first
+                await loadOverview();
+                // Connect WebSockets
+                connectLogStream();
+                connectToolStream();
+                // Periodic refresh
+                setInterval(loadOverview, 10000);
+            }
         }
 
         init();

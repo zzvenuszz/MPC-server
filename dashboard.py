@@ -210,8 +210,53 @@ def create_dashboard_app():
     app = web.Application()
 
     # =========================================================================
+    # Authentication Middleware
+    # =========================================================================
+    async def auth_middleware(request, handler):
+        """Middleware kiểm tra authentication"""
+        # Skip auth cho login endpoint và static files
+        if request.path == '/api/auth/login':
+            return await handler(request)
+        
+        # Skip auth cho static files
+        if request.path.startswith('/static/'):
+            return await handler(request)
+        
+        # Kiểm tra session/cookie
+        auth_token = request.cookies.get('dashboard_auth')
+        if auth_token != 'authenticated':
+            return web.json_response({'error': 'Unauthorized'}, status=401)
+        
+        return await handler(request)
+
+    app.middlewares.append(auth_middleware)
+
+    # =========================================================================
     # API Routes
     # =========================================================================
+
+    async def api_auth_login(request):
+        """POST /api/auth/login - Đăng nhập"""
+        try:
+            data = await request.json()
+            password = data.get('password', '')
+            
+            # Lấy password từ environment variable
+            expected_password = os.environ.get('PASSWORD', '')
+            
+            if not expected_password:
+                # Nếu không có PASSWORD env, cho phép truy cập (development mode)
+                return web.json_response({'status': 'ok'})
+            
+            if password == expected_password:
+                # Tạo response với cookie
+                response = web.json_response({'status': 'ok'})
+                response.set_cookie('dashboard_auth', 'authenticated', max_age=86400, httponly=True)
+                return response
+            else:
+                return web.json_response({'error': 'Invalid password'}, status=401)
+        except Exception as e:
+            return web.json_response({'error': str(e)}, status=400)
 
     async def api_logs(request):
         """GET /api/logs - Lấy logs"""
@@ -402,6 +447,7 @@ def create_dashboard_app():
     # =========================================================================
     # Register routes
     # =========================================================================
+    app.router.add_post("/api/auth/login", api_auth_login)
     app.router.add_get("/api/logs", api_logs)
     app.router.add_get("/api/logs/stream", api_log_stream)
     app.router.add_get("/api/tools", api_tools)
