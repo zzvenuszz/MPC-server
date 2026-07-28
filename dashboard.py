@@ -980,71 +980,109 @@ def get_starlette_routes():
             }
         })
     
-    async def api_console_execute(request):
-        """POST /api/console/execute - Execute shell command (requires auth)"""
-        # Check authentication
-        auth_cookie = request.cookies.get('dashboard_auth')
+    async def api_console_ws(websocket):
+        """WebSocket /api/console/ws - Persistent terminal session"""
+        # Check authentication via query param or cookie
+        auth_cookie = websocket.cookies.get('dashboard_auth')
         if not auth_cookie or auth_cookie != 'authenticated':
-            return JSONResponse({"error": "Unauthorized"}, status_code=401)
+            await websocket.close(code=4001, reason="Unauthorized")
+            return
+        
+        await websocket.accept()
         
         try:
-            data = await request.json()
-            command = data.get('command', '').strip()
-            
-            if not command:
-                return JSONResponse({"error": "Command is required"}, status_code=400)
-            
-            # Validate command against allowed list
             from config import get_settings
             settings = get_settings()
             
             if not settings.allow_shell:
-                return JSONResponse({"error": "Shell commands are disabled"}, status_code=403)
+                await websocket.send_json({"error": "Shell commands are disabled"})
+                await websocket.close()
+                return
             
-            # Check if command is allowed
-            cmd_name = command.split()[0] if command else ""
-            allowed_commands = settings.allowed_shell_commands
-            
-            if cmd_name not in allowed_commands:
-                return JSONResponse({
-                    "error": f"Command '{cmd_name}' is not allowed",
-                    "allowed_commands": allowed_commands
-                }, status_code=403)
-            
-            # Execute command
+            # Create persistent shell process
             import subprocess
             import shlex
             
-            logger.info(f"Executing console command: {command}")
+            # Spawn bash shell with persistent session
+            process = subprocess.Popen(
+                ['bash'],
+                stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                cwd=str(settings.workspace),
+                shell=False,
+                text=True,
+                bufsize=1,
+                universal_newlines=True
+            )
             
-            # Run command with timeout
-            try:
-                result = subprocess.run(
-                    command,
-                    shell=True,
-                    capture_output=True,
-                    text=True,
-                    timeout=30,
-                    cwd=str(settings.workspace)
-                )
-                
-                return JSONResponse({
-                    "command": command,
-                    "stdout": result.stdout,
-                    "stderr": result.stderr,
-                    "return_code": result.returncode,
-                    "success": result.returncode == 0
-                })
-                
-            except subprocess.TimeoutExpired:
-                return JSONResponse({
-                    "error": "Command timed out (30s limit)",
-                    "command": command
-                }, status_code=408)
-                
+            logger.info(f"Terminal session started, PID: {process.pid}")
+            
+            # Send welcome message
+            await websocket.send_json({
+                "type": "output",
+                "data": f"Welcome to MCP Server Console\nWorking directory: {settings.workspace}\n---\n"
+            })
+            
+            # Task to read stdout and send to websocket
+            async def read_stdout():
+                try:
+                    while True:
+                        line = process.stdout.readline()
+                        if not line:
+                            break
+                        await websocket.send_json({
+                            "type": "output",
+                            "data": line
+                        })
+                except Exception as e:
+                    logger.error(f"Error reading stdout: {e}")
+            
+            # Task to receive commands from websocket
+            async def receive_commands():
+                try:
+                    while True:
+                        message = await websocket.receive_json()
+                        if message.get('type') == 'command':
+                            command = message.get('command', '')
+                            if command:
+                                # Send command to stdin
+                                process.stdin.write(command + '\n')
+                                process.stdin.flush()
+                        elif message.get('type') == 'signal':
+                            # Handle Ctrl+C, etc.
+                            signal = message.get('signal')
+                            if signal == 'SIGINT':
+                                process.send_signal(subprocess.signal.SIGINT)
+                except Exception as e:
+                    logger.error(f"Error receiving commands: {e}")
+            
+            # Run both tasks concurrently
+            import asyncio
+            await asyncio.gather(
+                read_stdout(),
+                receive_commands(),
+                return_exceptions=True
+            )
+            
         except Exception as e:
-            logger.error(f"Console execution error: {e}")
-            return JSONResponse({"error": str(e)}, status_code=500)
+            logger.error(f"Terminal session error: {e}")
+            try:
+                await websocket.send_json({"error": str(e)})
+            except:
+                pass
+        finally:
+            # Cleanup
+            try:
+                process.terminate()
+                process.wait(timeout=5)
+            except:
+                process.kill()
+            logger.info("Terminal session closed")
+            try:
+                await websocket.close()
+            except:
+                pass
     
     async def dashboard_index(request):
         """Serve dashboard index.html"""
@@ -1070,7 +1108,7 @@ def get_starlette_routes():
         Route("/api/keys", api_keys, methods=["GET"]),
         Route("/api/keys", api_keys_update, methods=["POST"]),
         Route("/api/status", api_server_status, methods=["GET"]),
-        Route("/api/console/execute", api_console_execute, methods=["POST"]),
+        WebSocketRoute("/api/console/ws", api_console_ws),
         Mount("/static", app=StaticFiles(directory=str(Path(__file__).parent / "dashboard_static")), name="dashboard-static"),
     ])
     

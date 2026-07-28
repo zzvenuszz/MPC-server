@@ -703,8 +703,7 @@
            ============================================================ */
         .console-container {
             background: #0a0a0a;
-            border-radius: var(--radius-sm);
-            padding: 16px;
+            padding: 0;
             font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
             font-size: 13px;
             line-height: 1.6;
@@ -716,62 +715,71 @@
         .console-output {
             flex: 1;
             overflow-y: auto;
-            margin-bottom: 12px;
-            padding: 12px;
+            padding: 16px;
             background: #000;
-            border-radius: var(--radius-sm);
-            border: 1px solid var(--border-color);
+            min-height: 400px;
+            max-height: 600px;
         }
 
         .console-line {
-            color: var(--text-primary);
-            margin-bottom: 4px;
+            color: #e8eaed;
+            margin-bottom: 2px;
             word-break: break-all;
+            white-space: pre-wrap;
         }
 
         .console-line.command {
-            color: var(--info);
+            color: #448aff;
+            font-weight: 500;
         }
 
         .console-line.error {
-            color: var(--error);
+            color: #ff1744;
         }
 
         .console-line.success {
-            color: var(--success);
+            color: #00c853;
         }
 
         .console-line.info {
-            color: var(--info);
+            color: #78909c;
+        }
+
+        .console-line.system {
+            color: #ffd600;
         }
 
         .console-input-line {
             display: flex;
             gap: 8px;
             align-items: center;
+            padding: 12px 16px;
+            background: #0f1117;
+            border-top: 1px solid #2a2f45;
         }
 
         .console-prompt {
-            color: var(--success);
+            color: #00c853;
             font-weight: bold;
             font-size: 14px;
+            user-select: none;
         }
 
         .console-input {
             flex: 1;
-            background: var(--bg-input);
-            border: 1px solid var(--border-color);
-            border-radius: var(--radius-sm);
+            background: #161a2b;
+            border: 1px solid #2a2f45;
+            border-radius: 4px;
             padding: 8px 12px;
-            color: var(--text-primary);
+            color: #e8eaed;
             font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
             font-size: 13px;
         }
 
         .console-input:focus {
             outline: none;
-            border-color: var(--accent);
-            box-shadow: 0 0 0 3px var(--accent-glow);
+            border-color: #6c5ce7;
+            box-shadow: 0 0 0 2px rgba(108, 92, 231, 0.2);
         }
 
         /* ============================================================
@@ -1196,24 +1204,26 @@
             PAGE: CONSOLE
             ============================================================ -->
             <div class="page hidden" id="page-console">
-                <div class="card">
-                    <div class="card-header">
+                <div class="card" style="padding: 0; overflow: hidden;">
+                    <div class="card-header" style="padding: 16px 20px; margin: 0;">
                         <div>
                             <div class="card-title">Console</div>
-                            <div class="card-subtitle">Terminal - Execute shell commands</div>
+                            <div class="card-subtitle">Terminal - Shell commands</div>
                         </div>
-                        <button class="btn btn-sm" onclick="clearConsole()">🗑️ Clear</button>
+                        <div>
+                            <button class="btn btn-sm" onclick="clearConsole()">🗑️ Clear</button>
+                        </div>
                     </div>
                     <div class="console-container" id="console-container">
                         <div class="console-output" id="console-output">
-                            <div class="console-line">Welcome to MCP Server Console</div>
-                            <div class="console-line">Type 'help' for available commands</div>
-                            <div class="console-line">Current directory: /data</div>
-                            <div class="console-line">---</div>
+                            <div class="console-line info">Welcome to MCP Server Console</div>
+                            <div class="console-line info">Type 'help' for available commands</div>
+                            <div class="console-line info">Current directory: /data</div>
+                            <div class="console-line info">---</div>
                         </div>
                         <div class="console-input-line">
                             <span class="console-prompt">$</span>
-                            <input type="text" class="console-input" id="console-input" placeholder="Enter command..." autocomplete="off">
+                            <input type="text" class="console-input" id="console-input" placeholder="Enter command..." autocomplete="off" spellcheck="false">
                             <button class="btn btn-sm btn-primary" onclick="executeConsoleCommand()">▶️ Run</button>
                         </div>
                     </div>
@@ -1284,28 +1294,6 @@
             const overlay = document.getElementById('sidebar-overlay');
             sidebar.classList.toggle('active');
             overlay.classList.toggle('active');
-        }
-
-        function navigateTo(page) {
-            state.currentPage = page;
-            // Update nav
-            document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
-            document.querySelector(`.nav-item[data-page="${page}"]`)?.classList.add('active');
-            // Update pages
-            document.querySelectorAll('.page').forEach(p => p.classList.add('hidden'));
-            document.getElementById(`page-${page}`)?.classList.remove('hidden');
-            // Update title
-            const titles = { overview: 'Dashboard', logs: 'Logs', 'tool-usage': 'Tool Usage',
-                tools: 'Tools', config: 'Configuration', keys: 'API Keys' };
-            document.getElementById('page-title').textContent = titles[page] || page;
-            // Load data
-            if (page === 'overview') loadOverview();
-            if (page === 'tools') loadTools();
-            if (page === 'config') loadConfig();
-            if (page === 'keys') loadKeys();
-            // Render existing data when navigating to logs/tool-usage
-            if (page === 'logs') renderAllLogs();
-            if (page === 'tool-usage') renderAllToolCalls();
         }
 
         // ============================================================
@@ -1975,8 +1963,54 @@ You can modify this file or delete it after testing.
         });
 
         // ============================================================
-        // CONSOLE
+        // CONSOLE - Real Terminal with WebSocket
         // ============================================================
+        let consoleHistory = [];
+        let consoleHistoryIndex = -1;
+        let consoleWs = null;
+
+        function connectConsole() {
+            if (consoleWs) {
+                consoleWs.close();
+            }
+            
+            const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+            consoleWs = new WebSocket(`${protocol}//${location.host}/api/console/ws`);
+            
+            consoleWs.onopen = () => {
+                console.log('Console WebSocket connected');
+            };
+            
+            consoleWs.onmessage = (event) => {
+                const msg = JSON.parse(event.data);
+                if (msg.type === 'output') {
+                    const output = document.getElementById('console-output');
+                    const line = document.createElement('div');
+                    line.className = 'console-line';
+                    line.textContent = msg.data;
+                    output.appendChild(line);
+                    output.scrollTop = output.scrollHeight;
+                } else if (msg.error) {
+                    const output = document.getElementById('console-output');
+                    const errorLine = document.createElement('div');
+                    errorLine.className = 'console-line error';
+                    errorLine.textContent = `Error: ${msg.error}`;
+                    output.appendChild(errorLine);
+                    output.scrollTop = output.scrollHeight;
+                }
+            };
+            
+            consoleWs.onclose = () => {
+                console.log('Console WebSocket closed');
+                // Reconnect after 2 seconds
+                setTimeout(connectConsole, 2000);
+            };
+            
+            consoleWs.onerror = (error) => {
+                console.error('Console WebSocket error:', error);
+            };
+        }
+
         async function executeConsoleCommand() {
             const input = document.getElementById('console-input');
             const command = input.value.trim();
@@ -1984,6 +2018,10 @@ You can modify this file or delete it after testing.
             if (!command) return;
             
             const output = document.getElementById('console-output');
+            
+            // Add to history
+            consoleHistory.push(command);
+            consoleHistoryIndex = consoleHistory.length;
             
             // Add command to output
             const cmdLine = document.createElement('div');
@@ -1994,59 +2032,90 @@ You can modify this file or delete it after testing.
             // Clear input
             input.value = '';
             
-            try {
-                const result = await apiPost('/api/console/execute', { command });
-                
-                // Add output
-                if (result.stdout) {
-                    const stdoutLine = document.createElement('div');
-                    stdoutLine.className = 'console-line';
-                    stdoutLine.textContent = result.stdout;
-                    output.appendChild(stdoutLine);
-                }
-                
-                if (result.stderr) {
-                    const stderrLine = document.createElement('div');
-                    stderrLine.className = 'console-line error';
-                    stderrLine.textContent = result.stderr;
-                    output.appendChild(stderrLine);
-                }
-                
-                if (result.error) {
-                    const errorLine = document.createElement('div');
-                    errorLine.className = 'console-line error';
-                    errorLine.textContent = `Error: ${result.error}`;
-                    output.appendChild(errorLine);
-                }
-                
-                // Scroll to bottom
-                output.scrollTop = output.scrollHeight;
-                
-            } catch (e) {
+            // Scroll to bottom
+            output.scrollTop = output.scrollHeight;
+            
+            // Send command via WebSocket
+            if (consoleWs && consoleWs.readyState === WebSocket.OPEN) {
+                consoleWs.send(JSON.stringify({
+                    type: 'command',
+                    command: command
+                }));
+            } else {
                 const errorLine = document.createElement('div');
                 errorLine.className = 'console-line error';
-                errorLine.textContent = `Error: ${e.message || e.toString()}`;
+                errorLine.textContent = 'Error: WebSocket not connected';
                 output.appendChild(errorLine);
                 output.scrollTop = output.scrollHeight;
             }
+            
+            // Focus back to input
+            input.focus();
         }
 
         function clearConsole() {
             const output = document.getElementById('console-output');
-            output.innerHTML = '<div class="console-line">Console cleared</div><div class="console-line">---</div>';
+            output.innerHTML = '<div class="console-line info">Console cleared</div><div class="console-line system">---</div>';
+            consoleHistory = [];
+            consoleHistoryIndex = -1;
         }
 
-        // Handle Enter key in console input
+        // Handle Enter key and arrow keys in console input
         document.addEventListener('DOMContentLoaded', () => {
             const consoleInput = document.getElementById('console-input');
             if (consoleInput) {
-                consoleInput.addEventListener('keypress', (e) => {
+                consoleInput.addEventListener('keydown', (e) => {
                     if (e.key === 'Enter') {
+                        e.preventDefault();
                         executeConsoleCommand();
+                    } else if (e.key === 'ArrowUp') {
+                        e.preventDefault();
+                        // Navigate history backwards
+                        if (consoleHistoryIndex > 0) {
+                            consoleHistoryIndex--;
+                            consoleInput.value = consoleHistory[consoleHistoryIndex];
+                        }
+                    } else if (e.key === 'ArrowDown') {
+                        e.preventDefault();
+                        // Navigate history forwards
+                        if (consoleHistoryIndex < consoleHistory.length - 1) {
+                            consoleHistoryIndex++;
+                            consoleInput.value = consoleHistory[consoleHistoryIndex];
+                        } else {
+                            consoleHistoryIndex = consoleHistory.length;
+                            consoleInput.value = '';
+                        }
                     }
                 });
             }
         });
+
+        // Connect console WebSocket when navigating to console page
+        function navigateTo(page) {
+            state.currentPage = page;
+            // Update nav
+            document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+            document.querySelector(`.nav-item[data-page="${page}"]`)?.classList.add('active');
+            // Update pages
+            document.querySelectorAll('.page').forEach(p => p.classList.add('hidden'));
+            document.getElementById(`page-${page}`)?.classList.remove('hidden');
+            // Update title
+            const titles = { overview: 'Dashboard', logs: 'Logs', 'tool-usage': 'Tool Usage',
+                tools: 'Tools', console: 'Console', config: 'Configuration', keys: 'API Keys' };
+            document.getElementById('page-title').textContent = titles[page] || page;
+            // Load data
+            if (page === 'overview') loadOverview();
+            if (page === 'tools') loadTools();
+            if (page === 'config') loadConfig();
+            if (page === 'keys') loadKeys();
+            // Connect console WebSocket when navigating to console
+            if (page === 'console') {
+                connectConsole();
+            }
+            // Render existing data when navigating to logs/tool-usage
+            if (page === 'logs') renderAllLogs();
+            if (page === 'tool-usage') renderAllToolCalls();
+        }
 
         // ============================================================
         // CONFIG
