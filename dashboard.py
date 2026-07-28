@@ -676,6 +676,9 @@ def get_starlette_routes():
     
     routes = []
     
+    # Logger cho Starlette routes
+    logger = logging.getLogger("mcp-server")
+    
     # API Routes
     async def api_auth_login(request):
         """POST /api/auth/login - Đăng nhập"""

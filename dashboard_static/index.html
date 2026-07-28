@@ -1663,10 +1663,14 @@ You can modify this file or delete it after testing.
                 if (result.status === 'success') {
                     showToast(`✅ ${name} executed successfully (${result.duration_ms}ms)`, 'success');
                 } else {
-                    showToast(`❌ ${name} failed: ${result.error}`, 'error');
+                    // Show detailed error message
+                    const errorMsg = result.error || result.detail || 'Unknown error';
+                    showToast(`❌ ${name} failed: ${errorMsg}`, 'error');
+                    console.error('Tool test error:', result);
                 }
             } catch (e) {
-                showToast(`Error testing ${name}`, 'error');
+                showToast(`❌ Error testing ${name}: ${e.message || e.toString()}`, 'error');
+                console.error('Tool test exception:', e);
             }
         }
 
