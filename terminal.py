@@ -53,24 +53,25 @@ def create_terminal_session(session_id: str, cols: int = 80, rows: int = 24, cwd
                 os.close(slave_fd)
             
             # Change to working directory
-            os.chdir(cwd)
+            try:
+                os.chdir(cwd)
+            except Exception:
+                # If cwd doesn't exist, use home
+                os.chdir(os.path.expanduser("~"))
             
             # Set environment variables
             os.environ["TERM"] = "xterm-256color"
             os.environ["HOME"] = os.path.expanduser("~")
             os.environ["SHELL"] = "/bin/bash"
+            os.environ["USER"] = os.environ.get("USER", "mcpuser")
+            os.environ["LOGNAME"] = os.environ.get("LOGNAME", "mcpuser")
             
-            # Try to execute bash as ubuntu user
-            # Method 1: Try sudo
+            # Execute bash (interactive, login shell)
             try:
-                os.execve("/usr/bin/sudo", ["sudo", "-u", "ubuntu", "/bin/bash", "--login"], os.environ)
-            except OSError:
-                # Method 2: Try su (will fail without password, but try anyway)
-                try:
-                    os.execve("/bin/su", ["su", "-", "ubuntu"], os.environ)
-                except OSError:
-                    # Method 3: Fallback to current user
-                    os.execve("/bin/bash", ["/bin/bash", "--login"], os.environ)
+                os.execve("/bin/bash", ["/bin/bash", "-i", "-l"], os.environ)
+            except Exception:
+                # Fallback to /bin/sh if bash doesn't exist
+                os.execve("/bin/sh", ["/bin/sh", "-i"], os.environ)
             os._exit(1)
         
         # Parent process
