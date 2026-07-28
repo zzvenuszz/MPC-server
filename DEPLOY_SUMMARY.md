@@ -30,7 +30,9 @@
   - Tích hợp REST API endpoints: `/api/terminal/*`
   - Frontend sử dụng xterm.js cho terminal emulation
   - Real bash shell với đầy đủ tính năng (Ctrl+C, persistent session)
-  - **Chạy với user `ubuntu`** (setuid/setgid)
+  - **User**: Terminal sẽ chạy với user hiện tại (mcpuser trên HF Spaces)
+    - Code đã thử `setuid` sang `ubuntu`, `sudo`, và `su`
+    - Trên HF Spaces không có quyền root nên fallback về user hiện tại
   - Working directory: `/data`
 
 
@@ -88,7 +90,7 @@ Sau khi push code, restart Hugging Face Space để áp dụng thay đổi.
 - Real bash shell với đầy đủ tính năng
 - Persistent session (giữ nguyên khi chuyển tab)
 - Support Ctrl+C, Ctrl+Z, etc.
-- Working directory: `/tmp/mcp-workspace`
+- Working directory: `/data`
 
 ### Test Tool
 1. Vào tab "Tools"
@@ -100,9 +102,9 @@ Sau khi push code, restart Hugging Face Space để áp dụng thay đổi.
 ## Lưu ý quan trọng
 
 1. **Terminal API yêu cầu authentication**: Phải đăng nhập trước khi dùng terminal
-2. **Workspace**: Tất cả file operations dùng `/tmp/mcp-workspace`
+2. **Workspace**: Tất cả file operations dùng `/data`
 3. **Shell commands**: Chỉ chạy được commands trong `allowed_shell_commands`
-4. **No persistent storage**: Trên HF Spaces, mọi thứ trong `/tmp` sẽ mất khi restart
+4. **No persistent storage**: Trên HF Spaces, dữ liệu sẽ mất khi restart
 
 ## Troubleshooting
 
