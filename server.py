@@ -1183,21 +1183,12 @@ if __name__ == "__main__":
             static_dir = Path(__file__).parent / "dashboard_static"
             index_html = static_dir / "index.html"
             
-            # Dashboard routes
-            async def dashboard_index(request):
-                """Serve dashboard index.html"""
-                if index_html.exists():
-                    return FileResponse(index_html)
-                return Response(text="Dashboard not found", status_code=404)
-            
             # Mount dashboard routes vào FastMCP app
-            # Dashboard API routes
-            dashboard_routes = [
-                Route("/", dashboard_index, methods=["GET"]),
-                Mount("/static", app=StaticFiles(directory=str(static_dir)), name="dashboard-static"),
-            ]
-            
             app = mcp.sse_app()
+            
+            # Import Starlette routes từ dashboard
+            from dashboard import get_starlette_routes
+            dashboard_routes = get_starlette_routes()
             app.routes.extend(dashboard_routes)
             logger.info("Dashboard đã được mount vào MCP Server tại /")
             

@@ -640,12 +640,261 @@ def log_tool_call(tool_name: str, arguments: Dict[str, Any], result: Any = None,
 
 
 # =============================================================================
+# Starlette Routes - Cho FastMCP SSE App
+# =============================================================================
+
+def get_starlette_routes():
+    """Tạo danh sách Starlette routes để mount vào FastMCP SSE app"""
+    from starlette.routing import Route, Mount, WebSocketRoute
+    from starlette.responses import JSONResponse, FileResponse, Response
+    from starlette.staticfiles import StaticFiles
+    
+    routes = []
+    
+    # API Routes
+    async def api_auth_login(request):
+        """POST /api/auth/login - Đăng nhập"""
+        try:
+            data = await request.json()
+            password = data.get('password', '')
+            
+            # Lấy password từ environment variable
+            expected_password = os.environ.get('PASSWORD', '')
+            
+            if not expected_password:
+                # Nếu không có PASSWORD env, cho phép truy cập (development mode)
+                return JSONResponse({'status': 'ok'})
+            
+            if password == expected_password:
+                # Tạo response với cookie
+                response = JSONResponse({'status': 'ok'})
+                response.set_cookie('dashboard_auth', 'authenticated', max_age=86400, httponly=True)
+                return response
+            else:
+                return JSONResponse({'error': 'Invalid password'}, status_code=401)
+        except Exception as e:
+            return JSONResponse({'error': str(e)}, status_code=400)
+    
+    async def api_logs(request):
+        """GET /api/logs - Lấy logs"""
+        level = request.query_params.get("level", "").upper()
+        limit = int(request.query_params.get("limit", 200))
+        logs = list(_log_handler.logs)
+        if level:
+            logs = [l for l in logs if l["level"] == level]
+        return JSONResponse(logs[-limit:])
+    
+    async def api_log_stream(websocket):
+        """WebSocket /api/logs/stream - Stream logs"""
+        await websocket.accept()
+        q = await _log_handler.subscribe()
+        try:
+            # Gửi logs hiện tại
+            current_logs = list(_log_handler.logs)[-50:]
+            await websocket.send_json({"type": "init", "data": current_logs})
+            # Stream logs mới
+            while True:
+                try:
+                    log_entry = await asyncio.wait_for(q.get(), timeout=30)
+                    await websocket.send_json({"type": "log", "data": log_entry})
+                except asyncio.TimeoutError:
+                    await websocket.send_json({"type": "ping"})
+        except Exception:
+            pass
+        finally:
+            _log_handler.unsubscribe(q)
+    
+    async def api_tools(request):
+        """GET /api/tools - Lấy danh sách tools"""
+        tools_info = _get_tools_list()
+        for t in tools_info:
+            t["enabled"] = _tool_registry.is_enabled(t["name"])
+        return JSONResponse(tools_info)
+    
+    async def api_tools_toggle(request):
+        """POST /api/tools/{name}/toggle - Bật/tắt tool"""
+        name = request.path_params.get("name")
+        data = await request.json()
+        enabled = data.get("enabled")
+        _tool_registry.toggle(name, enabled)
+        return JSONResponse({"name": name, "enabled": _tool_registry.is_enabled(name)})
+    
+    async def api_tool_usage(request):
+        """GET /api/tools/usage - Lấy thống kê sử dụng tool"""
+        stats = _tool_tracker.get_tool_stats()
+        return JSONResponse({
+            "stats": stats,
+            "recent_calls": list(_tool_tracker.records)[-50:]
+        })
+    
+    async def api_tool_stream(websocket):
+        """WebSocket /api/tools/stream - Stream tool calls"""
+        await websocket.accept()
+        q = await _tool_tracker.subscribe()
+        try:
+            recent = list(_tool_tracker.records)[-20:]
+            await websocket.send_json({"type": "init", "data": recent})
+            while True:
+                try:
+                    record = await asyncio.wait_for(q.get(), timeout=30)
+                    await websocket.send_json({"type": "tool_call", "data": record})
+                except asyncio.TimeoutError:
+                    await websocket.send_json({"type": "ping"})
+        except Exception:
+            pass
+        finally:
+            _tool_tracker.unsubscribe(q)
+    
+    async def api_config(request):
+        """GET /api/config - Lấy cấu hình hiện tại"""
+        from config import get_settings
+        settings = get_settings()
+        config = {
+            "workspace": str(settings.workspace),
+            "log_level": settings.log_level,
+            "request_timeout": settings.request_timeout,
+            "max_file_size": settings.max_file_size,
+            "allow_shell": settings.allow_shell,
+            "allow_write": settings.allow_write,
+            "allowed_shell_commands": settings.allowed_shell_commands,
+            "github_token": "***" if settings.github_token else None,
+            "cultivation_language": settings.cultivation_language,
+            "cultivation_detail_level": settings.cultivation_detail_level,
+            "rate_limit_per_minute": settings.rate_limit_per_minute,
+            "max_concurrent_requests": settings.max_concurrent_requests,
+            "verify_ssl": settings.verify_ssl,
+        }
+        return JSONResponse(config)
+    
+    async def api_config_update(request):
+        """POST /api/config - Cập nhật cấu hình"""
+        from config import reload_settings, get_settings
+        data = await request.json()
+        # Chỉ cập nhật các biến môi trường
+        for key, value in data.items():
+            env_key = key.upper()
+            if value is not None:
+                os.environ[env_key] = str(value)
+        # Reload settings
+        new_settings = reload_settings()
+        return JSONResponse({"status": "updated", "log_level": new_settings.log_level})
+    
+    async def api_keys(request):
+        """GET /api/keys - Lấy danh sách API keys"""
+        from config import get_settings
+        settings = get_settings()
+        keys = {}
+        if settings.github_token:
+            keys["github_token"] = "***" + settings.github_token[-4:]
+        return JSONResponse(keys)
+    
+    async def api_keys_update(request):
+        """POST /api/keys - Cập nhật API key"""
+        from config import reload_settings
+        data = await request.json()
+        for key, value in data.items():
+            env_key = key.upper()
+            os.environ[env_key] = value
+        reload_settings()
+        return JSONResponse({"status": "updated"})
+    
+    async def api_test_tool(request):
+        """POST /api/tools/{name}/test - Test một tool"""
+        name = request.path_params.get("name")
+        data = await request.json()
+        args = data.get("arguments", {})
+        try:
+            from server import mcp
+            start = time.time()
+            result = await mcp.call_tool(name, args)
+            duration = (time.time() - start) * 1000
+            _tool_tracker.log_call(name, args, result, "success", duration)
+            return JSONResponse({
+                "status": "success",
+                "result": str(result),
+                "duration_ms": round(duration, 2)
+            })
+        except Exception as e:
+            _tool_tracker.log_call(name, args, None, "error", 0, str(e))
+            return JSONResponse({"status": "error", "error": str(e)}, status_code=400)
+    
+    async def api_server_status(request):
+        """GET /api/status - Lấy trạng thái server"""
+        import psutil
+        try:
+            cpu_percent = psutil.cpu_percent(interval=0.1)
+            memory = psutil.virtual_memory()
+            uptime = time.time() - psutil.boot_time()
+        except ImportError:
+            cpu_percent = 0
+            memory = type('obj', (object,), {'percent': 0, 'used': 0, 'total': 0})()
+            uptime = 0
+
+        from config import get_settings
+        settings = get_settings()
+        tools_info = _get_tools_list()
+
+        return JSONResponse({
+            "server": {
+                "name": "MCP Programming Support Server",
+                "version": "1.0.0",
+                "status": "running",
+                "uptime_seconds": uptime,
+            },
+            "system": {
+                "cpu_percent": cpu_percent,
+                "memory_percent": memory.percent,
+                "memory_used": memory.used,
+                "memory_total": memory.total,
+            },
+            "tools": {
+                "total": len(tools_info),
+                "enabled": sum(1 for t in tools_info if _tool_registry.is_enabled(t["name"])),
+            },
+            "config": {
+                "log_level": settings.log_level,
+                "workspace": str(settings.workspace),
+            }
+        })
+    
+    async def dashboard_index(request):
+        """Serve dashboard index.html"""
+        static_dir = Path(__file__).parent / "dashboard_static"
+        index_html = static_dir / "index.html"
+        if index_html.exists():
+            return FileResponse(index_html)
+        return Response(text="Dashboard not found", status_code=404)
+    
+    # Register routes
+    routes.extend([
+        Route("/", dashboard_index, methods=["GET"]),
+        Route("/api/auth/login", api_auth_login, methods=["POST"]),
+        Route("/api/logs", api_logs, methods=["GET"]),
+        WebSocketRoute("/api/logs/stream", api_log_stream),
+        Route("/api/tools", api_tools, methods=["GET"]),
+        Route("/api/tools/{name}/toggle", api_tools_toggle, methods=["POST"]),
+        Route("/api/tools/{name}/test", api_test_tool, methods=["POST"]),
+        Route("/api/tools/usage", api_tool_usage, methods=["GET"]),
+        WebSocketRoute("/api/tools/stream", api_tool_stream),
+        Route("/api/config", api_config, methods=["GET"]),
+        Route("/api/config", api_config_update, methods=["POST"]),
+        Route("/api/keys", api_keys, methods=["GET"]),
+        Route("/api/keys", api_keys_update, methods=["POST"]),
+        Route("/api/status", api_server_status, methods=["GET"]),
+        Mount("/static", app=StaticFiles(directory=str(Path(__file__).parent / "dashboard_static")), name="dashboard-static"),
+    ])
+    
+    return routes
+
+
+# =============================================================================
 # Export
 # =============================================================================
 __all__ = [
     "setup_dashboard_logging",
     "start_dashboard_thread",
     "create_dashboard_app",
+    "get_starlette_routes",
     "log_tool_call",
     "_log_handler",
     "_tool_tracker",

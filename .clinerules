@@ -1,78 +1,347 @@
-# CLINE RULES - Quy tắc báo cáo và xử lý lỗi
+# ============================================
+# CLINE RULES
+# Version: 1.0
+# ============================================
 
-## 0. Thông tin môi trường
+# Mục tiêu:
+# - Ưu tiên tìm đúng nguyên nhân gốc (Root Cause)
+# - Sửa với phạm vi thay đổi nhỏ nhất
+# - Không phá vỡ chức năng đang hoạt động
+# - Không sửa theo suy đoán
+# - Báo cáo rõ ràng, có dẫn chứng
 
-### Môi trường hiện tại:
-- **Platform**: Hugging Face Spaces
-- **Public Address**: https://huyhoan76-cline.hf.space/
-- **Port**: 7860 (HF Spaces chỉ expose port này)
-- **Transport**: SSE (Server-Sent Events)
-- **MCP Endpoint**: https://huyhoan76-cline.hf.space/sse
-- **Protocol**: JSON-RPC 2.0 over SSE
+====================================================
+## MÔI TRƯỜNG
+====================================================
 
-### Lưu ý quan trọng:
-- Server phải bind to 0.0.0.0 (không phải 127.0.0.1)
-- FastMCP đọc HOST và PORT từ environment variables
-- Cline kết nối qua URL: https://huyhoan76-cline.hf.space/sse
+Môi trường hiện tại:
 
-## 1. Quy tắc báo cáo kết quả
+- Hugging Face Spaces
+- Docker
+- FastMCP
+- SSE Transport
 
-### Khi báo cáo kết quả sau khi sửa lỗi:
-- **PHẢI** phân tích rõ nguyên nhân gốc gây lỗi
-- **PHẢI** giải thích chi tiết cách giải quyết đã áp dụng
-- **PHẢI** báo cáo kết quả cụ thể, không được dùng mẫu chung chung
-- **PHẢI** chỉ ra sự khác biệt so với lần trước (nếu có)
-- **PHẢI** liệt kê các thay đổi thực tế đã thực hiện
+Yêu cầu:
 
-### Cấu trúc báo cáo:
-```
+- Không hardcode HOST.
+- Không hardcode PORT.
+- Luôn đọc HOST và PORT từ Environment Variables.
+- Server phải bind vào HOST và PORT được cấu hình.
+- Không giả định môi trường chạy.
+- Không thay đổi cấu hình môi trường nếu chưa xác định nguyên nhân.
+
+====================================================
+## NGÔN NGỮ
+====================================================
+
+Người dùng sử dụng tiếng Việt.
+
+Vì vậy:
+
+- Toàn bộ báo cáo sử dụng tiếng Việt.
+- Toàn bộ giải thích sử dụng tiếng Việt.
+- Toàn bộ phân tích gửi cho người dùng sử dụng tiếng Việt.
+- Ưu tiên comment mới bằng tiếng Việt nếu phù hợp với dự án.
+
+Giữ nguyên tiếng Anh đối với:
+
+- Source code
+- API
+- Class
+- Function
+- Variable
+- Exception
+- Stack trace
+- Terminal output
+- Log
+- Tên framework
+- Tên thư viện
+
+Nếu hệ thống hiển thị reasoning/thinking cho người dùng thì ưu tiên trình bày bằng tiếng Việt.
+
+====================================================
+## QUY TRÌNH PHÂN TÍCH
+====================================================
+
+Trước khi sửa lỗi:
+
+1. Đọc đầy đủ thông báo lỗi.
+2. Đọc đầy đủ stack trace.
+3. Xác định Root Cause.
+4. Xác định file thực sự được thực thi.
+5. Xác định call chain.
+6. Đọc toàn bộ các file liên quan.
+7. Search toàn bộ project để tìm nơi sử dụng.
+
+Không được sửa chỉ dựa trên suy đoán.
+
+====================================================
+## SEARCH BẮT BUỘC
+====================================================
+
+Trước khi sửa phải search project nếu liên quan.
+
+Ví dụ:
+
+- class
+- function
+- route
+- endpoint
+- config
+- environment variable
+- import
+- dependency
+- docker
+- yaml
+- json
+
+Không được sửa khi chưa biết tất cả vị trí liên quan.
+
+====================================================
+## KHÔNG ĐƯỢC SUY ĐOÁN
+====================================================
+
+Nếu chưa đủ dữ liệu:
+
+- Không kết luận.
+- Không giả định.
+- Không viết code.
+
+Thay vào đó:
+
+1. Chỉ ra dữ liệu còn thiếu.
+2. Đề xuất lệnh cần chạy.
+3. Chờ kết quả.
+
+Nếu nội dung chỉ là giả thuyết thì phải ghi rõ:
+
+"Đây là giả thuyết, cần kiểm chứng."
+
+Không được trình bày giả thuyết như kết luận.
+
+====================================================
+## QUY TẮC SỬA LỖI
+====================================================
+
+Ưu tiên:
+
+1. Thay đổi nhỏ nhất.
+2. Giữ nguyên kiến trúc nếu không cần.
+3. Không refactor nếu chỉ cần sửa bug.
+4. Không viết lại module nếu chỉ cần sửa vài dòng.
+
+Nếu hướng hiện tại vẫn còn khả năng giải quyết Root Cause:
+
+=> Tiếp tục hoàn thiện hướng đó.
+
+Chỉ chuyển sang hướng mới khi:
+
+- Có bằng chứng hướng hiện tại không thể giải quyết.
+- Hoặc đã xác minh hướng hiện tại thất bại.
+
+Không được đổi chiến lược chỉ vì đã thử một lần.
+
+Không được lặp lại chính xác một thay đổi đã được chứng minh là không hiệu quả.
+
+====================================================
+## BẢO TOÀN CHỨC NĂNG
+====================================================
+
+Không được:
+
+- Xóa chức năng đang hoạt động.
+- Thay đổi API hiện có.
+- Đổi cấu trúc project.
+- Refactor lớn.
+- Đổi framework.
+- Đổi thư viện.
+
+Trừ khi người dùng yêu cầu rõ ràng.
+
+====================================================
+## TERMINAL
+====================================================
+
+Sau mỗi lệnh terminal:
+
+- Chờ output thực tế.
+- Không suy luận khi chưa có output.
+- Không giả định lệnh thành công.
+- Không tiếp tục khi chưa có output.
+
+Nếu terminal báo:
+
+- running
+- process while running
+
+=> Dừng và chờ người dùng gửi output.
+
+Nếu tool trả về:
+
+- skipped
+- timeout
+
+thì coi đó là giới hạn của môi trường.
+
+Không được giả định kết quả của lệnh.
+
+====================================================
+## TEST
+====================================================
+
+Sau khi sửa:
+
+Kiểm tra:
+
+- Lỗi đã hết chưa.
+- Có phát sinh lỗi mới không.
+- Chức năng cũ còn hoạt động không.
+
+Nếu có thể:
+
+- Chạy test.
+- Kiểm tra log.
+- Kiểm tra output.
+- Liệt kê routes.
+- Kiểm tra endpoint.
+- Dùng curl.
+- Kiểm tra Docker.
+- Kiểm tra Environment Variables.
+
+Không được chỉ kết luận:
+
+"Đã sửa."
+
+====================================================
+## BÁO CÁO
+====================================================
+
+Mỗi lần sửa phải báo cáo theo cấu trúc sau:
+
 ## Phân tích lỗi
-- Nguyên nhân: [mô tả chi tiết]
-- Vị trí: [file, dòng code]
-- Impact: [hậu quả]
 
-## Giải pháp áp dụng
-- Thay đổi 1: [mô tả]
-- Thay đổi 2: [mô tả]
+- Nguyên nhân
+- Root Cause
+- File liên quan
+- Vị trí
+- Impact
+
+## Giải pháp
+
+Liệt kê từng thay đổi.
+
+Ví dụ:
+
+- app.py
+- server.py
+- config.py
+- Dockerfile
+
+Đồng thời giải thích vì sao sửa.
 
 ## Kết quả
-- Trước: [tình trạng cũ]
-- Sau: [tình trạng mới]
-- Cách test: [hướng dẫn kiểm tra]
-```
 
-## 2. Quy tắc xử lý lỗi
+Trước:
 
-### Trước khi sửa lỗi:
-- Đọc và phân tích đầy đủ stack trace
-- Xác định root cause, không chỉ symptom
-- Kiểm tra xem đã từng sửa lỗi này chưa
+...
 
-### Khi sửa lỗi:
-- Mỗi lần sửa phải khác biệt so với lần trước
-- Không lặp lại cách tiếp cận đã thất bại
-- Nếu đã thử 2-3 cách và vẫn lỗi, cần phân tích lại hoàn toàn
+Sau:
 
-### Sau khi sửa lỗi:
-- Kiểm tra xem thay đổi có giải quyết đúng root cause không
-- Xác nhận không introduce lỗi mới
-- Test nếu có thể
+...
 
-## 3. Quy tắc giao tiếp
+Khác biệt:
 
-### Ngôn ngữ:
-- Sử dụng tiếng Việt khi người dùng dùng tiếng Việt
-- Rõ ràng, trực tiếp, không dùng thuật ngữ không cần thiết
+...
 
-### Nội dung:
-- Không được sao chép báo cáo cũ
-- Mỗi lần báo cáo phải có thông tin mới, cụ thể
-- Nếu không có gì thay đổi, phải nói rõ "không có thay đổi" thay vì copy paste
+Cách kiểm tra:
 
-## 4. Quy tắc thực thi lệnh
+...
 
-### Đợi kết quả lệnh:
-- **BẮT BUỘC** đợi output của lệnh sau khi thực thi
-- Không được skip hoặc bỏ qua kết quả lệnh
-- Nếu lệnh đang chạy (status "process while running"), phải đợi user copy output và gửi vào chat
-- Không tự ý thực thi lệnh tiếp theo nếu chưa có kết quả của lệnh trước
+Nếu chưa xác minh được thì phải ghi rõ:
+
+"Chưa thể xác minh do thiếu dữ liệu."
+
+====================================================
+## TÀI LIỆU
+====================================================
+
+Nếu sửa liên quan đến:
+
+- FastAPI
+- FastMCP
+- MCP
+- Docker
+- Hugging Face
+- GitHub Actions
+- PaperMC
+- Bukkit
+- Spigot
+- Velocity
+- Java API
+- Python Framework
+
+thì ưu tiên kiểm tra tài liệu chính thức hoặc API hiện tại trước khi thay đổi nếu hành vi phụ thuộc vào framework hoặc thư viện.
+
+Không sử dụng API cũ nếu có bằng chứng API đã thay đổi.
+
+====================================================
+## CÁCH TRẢ LỜI
+====================================================
+
+Không trả lời chung chung.
+
+Ưu tiên:
+
+- Có log.
+- Có output.
+- Có đường dẫn file.
+- Có tên hàm.
+- Có tên class.
+- Có nguyên nhân.
+- Có bằng chứng.
+- Có kết luận.
+
+Nếu chưa đủ bằng chứng:
+
+Không được kết luận.
+
+Thay vào đó phải ghi rõ:
+
+- Thiếu dữ liệu gì.
+- Cần chạy lệnh nào.
+- Cần kiểm tra file nào.
+
+====================================================
+## ƯU TIÊN
+====================================================
+
+Luôn ưu tiên theo thứ tự:
+
+1. Hiểu đúng vấn đề.
+2. Thu thập đầy đủ dữ liệu.
+3. Xác định Root Cause.
+4. Xác minh bằng chứng.
+5. Sửa với thay đổi nhỏ nhất.
+6. Kiểm tra kết quả.
+7. Báo cáo rõ ràng.
+
+Không viết code khi chưa hiểu nguyên nhân.
+
+Không sửa theo suy đoán.
+
+Không refactor khi chưa cần thiết.
+
+Không thay đổi kiến trúc nếu chỉ cần sửa lỗi.
+
+Nếu tồn tại nhiều phương án:
+
+- Chọn phương án ít thay đổi nhất.
+- Chọn phương án ít rủi ro nhất.
+- Giải thích vì sao chọn phương án đó.
+
+Mục tiêu cuối cùng:
+
+- Sửa đúng.
+- Sửa đủ.
+- Không làm hỏng chức năng khác.
+- Dễ bảo trì.
