@@ -1513,20 +1513,23 @@
             const lowerKey = key.toLowerCase();
             const lowerTool = toolName.toLowerCase();
             
-            // File path parameters
+            // TEST_SPACE folder for file operations
+            const testSpace = '/data/TEST_SPACE';
+            
+            // File path parameters - use TEST_SPACE
             if (lowerKey.includes('file') && lowerKey.includes('path')) {
-                return '/data/test.txt';
+                return `${testSpace}/test.txt`;
             }
             if (lowerKey.includes('directory') || lowerKey.includes('dir') || lowerKey.includes('path')) {
-                return '/data';
+                return testSpace;
             }
             if (lowerKey === 'file_path') {
-                return '/data/test.txt';
+                return `${testSpace}/test.txt`;
             }
             
             // Content parameters
             if (lowerKey === 'content') {
-                return 'Test content from dashboard';
+                return 'Test content from dashboard\nCreated at: ' + new Date().toISOString();
             }
             if (lowerKey === 'old_text') {
                 return 'old text';
@@ -1658,16 +1661,55 @@ You can modify this file or delete it after testing.
                 const result = await apiPost(`/api/tools/${name}/test`, { arguments: args });
                 const resultDiv = document.getElementById('test-result');
                 resultDiv.style.display = 'block';
-                document.getElementById('test-result-content').textContent =
-                    JSON.stringify(result, null, 2);
+                
+                // Format kết quả chi tiết, dễ đọc
+                let resultText = '';
                 if (result.status === 'success') {
+                    resultText = `✅ Tool: ${result.tool}\n`;
+                    resultText += `⏱️  Duration: ${result.duration_ms}ms\n\n`;
+                    resultText += `📋 Arguments:\n${JSON.stringify(result.arguments, null, 2)}\n\n`;
+                    resultText += `📊 Result:\n`;
+                    
+                    // Format result dựa trên loại data
+                    if (result.result && typeof result.result === 'object') {
+                        if (result.result.output) {
+                            resultText += result.result.output;
+                        } else if (result.result.content) {
+                            resultText += JSON.stringify(result.result.content, null, 2);
+                        } else if (result.result.files) {
+                            resultText += `Found ${result.result.total_found || result.result.files.length} files:\n`;
+                            result.result.files.slice(0, 10).forEach(f => {
+                                resultText += `  - ${f.path || f.name}\n`;
+                            });
+                        } else if (result.result.directories || result.result.files) {
+                            resultText += `\nDirectories (${result.result.total_directories || 0}):\n`;
+                            (result.result.directories || []).slice(0, 5).forEach(d => {
+                                resultText += `  📁 ${d.path}\n`;
+                            });
+                            resultText += `\nFiles (${result.result.total_files || 0}):\n`;
+                            (result.result.files || []).slice(0, 10).forEach(f => {
+                                resultText += `  📄 ${f.path} (${f.size_bytes || 0} bytes)\n`;
+                            });
+                        } else {
+                            resultText += JSON.stringify(result.result, null, 2);
+                        }
+                    } else {
+                        resultText += String(result.result);
+                    }
+                    
                     showToast(`✅ ${name} executed successfully (${result.duration_ms}ms)`, 'success');
                 } else {
-                    // Show detailed error message
-                    const errorMsg = result.error || result.detail || 'Unknown error';
-                    showToast(`❌ ${name} failed: ${errorMsg}`, 'error');
-                    console.error('Tool test error:', result);
+                    resultText = `❌ Tool: ${result.tool}\n`;
+                    resultText += `⏱️  Duration: ${result.duration_ms}ms\n\n`;
+                    resultText += `📋 Arguments:\n${JSON.stringify(result.arguments, null, 2)}\n\n`;
+                    resultText += `❌ Error:\n${result.error || result.detail || 'Unknown error'}\n\n`;
+                    resultText += `🔍 Detail:\n${result.detail || 'No additional details'}`;
+                    
+                    showToast(`❌ ${name} failed: ${result.error || 'Unknown error'}`, 'error');
                 }
+                
+                document.getElementById('test-result-content').textContent = resultText;
+                console.log('Tool test result:', result);
             } catch (e) {
                 showToast(`❌ Error testing ${name}: ${e.message || e.toString()}`, 'error');
                 console.error('Tool test exception:', e);

@@ -460,22 +460,31 @@ def create_dashboard_app():
             # Log tool info trước khi gọi
             logger.info(f"Calling mcp._tool_manager.call_tool('{name}', {args})")
             
-            # FastMCP tools là sync functions, cần chạy trong executor
-            import asyncio
-            loop = asyncio.get_event_loop()
-            result = await loop.run_in_executor(
-                None,
-                lambda: mcp._tool_manager.call_tool(name, args)
-            )
+            # Gọi tool - có thể trả về coroutine hoặc kết quả trực tiếp
+            result_raw = mcp._tool_manager.call_tool(name, args)
+            
+            # Nếu là coroutine, await nó
+            if asyncio.iscoroutine(result_raw):
+                result = await result_raw
+            else:
+                result = result_raw
             
             duration = (time.time() - start) * 1000
             _tool_tracker.log_call(name, args, result, "success", duration)
             
             logger.info(f"Tool {name} executed successfully in {duration}ms")
             
+            # Format kết quả chi tiết
+            if isinstance(result, dict):
+                formatted_result = result
+            else:
+                formatted_result = {"output": str(result)}
+            
             return web.json_response({
                 "status": "success",
-                "result": str(result),
+                "tool": name,
+                "arguments": args,
+                "result": formatted_result,
                 "duration_ms": round(duration, 2)
             })
         except Exception as e:
@@ -485,6 +494,8 @@ def create_dashboard_app():
             _tool_tracker.log_call(name, args, None, "error", 0, str(e))
             return web.json_response({
                 "status": "error", 
+                "tool": name,
+                "arguments": args,
                 "error": str(e),
                 "detail": error_detail
             }, status=400)
@@ -575,6 +586,42 @@ def _start_dashboard(host: str = "0.0.0.0", port: int = 8080):
 
     logger = logging.getLogger("mcp-server")
     logger.info(f"Dashboard đang khởi động trên http://{host}:{port}")
+    
+    # Tạo TEST_SPACE folder và file mẫu
+    try:
+        from config import get_settings
+        settings = get_settings()
+        test_space = settings.workspace / "TEST_SPACE"
+        test_space.mkdir(exist_ok=True)
+        
+        # Tạo file mẫu
+        test_file = test_space / "test.txt"
+        if not test_file.exists():
+            test_file.write_text("This is a test file for dashboard testing.\nCreated at: " + datetime.now().isoformat(), encoding="utf-8")
+        
+        # Tạo file JSON mẫu
+        json_file = test_space / "sample.json"
+        if not json_file.exists():
+            json_file.write_text('{"name": "test", "value": 123, "items": ["a", "b", "c"]}', encoding="utf-8")
+        
+        # Tạo file Python mẫu
+        py_file = test_space / "sample.py"
+        if not py_file.exists():
+            py_file.write_text('''# Sample Python file for testing
+def hello():
+    print("Hello from TEST_SPACE!")
+
+class TestClass:
+    def __init__(self):
+        self.value = 42
+    
+    def get_value(self):
+        return self.value
+''', encoding="utf-8")
+        
+        logger.info(f"TEST_SPACE folder created at: {test_space}")
+    except Exception as e:
+        logger.warning(f"Could not create TEST_SPACE: {e}")
 
     # Tạo event loop mới cho thread này (không dùng web.run_app vì nó dùng signal handlers)
     loop = asyncio.new_event_loop()
@@ -842,22 +889,31 @@ def get_starlette_routes():
             # Log tool info trước khi gọi
             logger.info(f"[Starlette] Calling mcp._tool_manager.call_tool('{name}', {args})")
             
-            # FastMCP tools là sync functions, cần chạy trong executor
-            import asyncio
-            loop = asyncio.get_event_loop()
-            result = await loop.run_in_executor(
-                None,
-                lambda: mcp._tool_manager.call_tool(name, args)
-            )
+            # Gọi tool - có thể trả về coroutine hoặc kết quả trực tiếp
+            result_raw = mcp._tool_manager.call_tool(name, args)
+            
+            # Nếu là coroutine, await nó
+            if asyncio.iscoroutine(result_raw):
+                result = await result_raw
+            else:
+                result = result_raw
             
             duration = (time.time() - start) * 1000
             _tool_tracker.log_call(name, args, result, "success", duration)
             
             logger.info(f"[Starlette] Tool {name} executed successfully in {duration}ms")
             
+            # Format kết quả chi tiết
+            if isinstance(result, dict):
+                formatted_result = result
+            else:
+                formatted_result = {"output": str(result)}
+            
             return JSONResponse({
                 "status": "success",
-                "result": str(result),
+                "tool": name,
+                "arguments": args,
+                "result": formatted_result,
                 "duration_ms": round(duration, 2)
             })
         except Exception as e:
@@ -867,6 +923,8 @@ def get_starlette_routes():
             _tool_tracker.log_call(name, args, None, "error", 0, str(e))
             return JSONResponse({
                 "status": "error", 
+                "tool": name,
+                "arguments": args,
                 "error": str(e),
                 "detail": error_detail
             }, status_code=400)
