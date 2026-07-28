@@ -1001,8 +1001,18 @@ def get_starlette_routes():
         from config import get_settings
         settings = get_settings()
         
+        # Helper function to check terminal authentication
+        def check_terminal_auth(request):
+            """Check if user is authenticated for terminal access"""
+            auth_cookie = request.cookies.get('dashboard_auth')
+            return auth_cookie == 'authenticated'
+        
         async def api_terminal_start(request):
             """POST /api/terminal/start - Start terminal session"""
+            # Check authentication
+            if not check_terminal_auth(request):
+                return JSONResponse({"error": "Unauthorized"}, status_code=401)
+            
             try:
                 data = await request.json()
                 cols = int(data.get('cols', 80))
@@ -1023,6 +1033,10 @@ def get_starlette_routes():
         
         async def api_terminal_input(request):
             """POST /api/terminal/input - Send input to terminal"""
+            # Check authentication
+            if not check_terminal_auth(request):
+                return JSONResponse({"error": "Unauthorized"}, status_code=401)
+            
             try:
                 data = await request.json()
                 session_id = data.get('session_id', 'default')
@@ -1036,6 +1050,10 @@ def get_starlette_routes():
         
         async def api_terminal_output(request):
             """GET /api/terminal/output - Get terminal output"""
+            # Check authentication
+            if not check_terminal_auth(request):
+                return JSONResponse({"error": "Unauthorized"}, status_code=401)
+            
             try:
                 session_id = request.query_params.get('session_id', 'default')
                 result = read_from_terminal(session_id)
@@ -1046,6 +1064,10 @@ def get_starlette_routes():
         
         async def api_terminal_resize(request):
             """POST /api/terminal/resize - Resize terminal"""
+            # Check authentication
+            if not check_terminal_auth(request):
+                return JSONResponse({"error": "Unauthorized"}, status_code=401)
+            
             try:
                 data = await request.json()
                 session_id = data.get('session_id', 'default')
@@ -1060,6 +1082,10 @@ def get_starlette_routes():
         
         async def api_terminal_stop(request):
             """POST /api/terminal/stop - Stop terminal session"""
+            # Check authentication
+            if not check_terminal_auth(request):
+                return JSONResponse({"error": "Unauthorized"}, status_code=401)
+            
             try:
                 data = await request.json()
                 session_id = data.get('session_id', 'default')
@@ -1093,7 +1119,6 @@ def get_starlette_routes():
         Route("/api/keys", api_keys, methods=["GET"]),
         Route("/api/keys", api_keys_update, methods=["POST"]),
         Route("/api/status", api_server_status, methods=["GET"]),
-        WebSocketRoute("/api/console/ws", api_console_ws),
         # Terminal routes (PTY-based)
         Route("/api/terminal/start", api_terminal_start, methods=["POST"]),
         Route("/api/terminal/input", api_terminal_input, methods=["POST"]),

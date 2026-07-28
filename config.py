@@ -28,7 +28,7 @@ class Settings(BaseSettings):
 
     # Thư mục làm việc chính
     workspace: Path = Field(
-        default=Path("/data"),
+        default=Path("/tmp/mcp-workspace"),
         description="Thư mục làm việc chính cho các thao tác file"
     )
 
