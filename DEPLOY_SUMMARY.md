@@ -33,10 +33,10 @@
   - **Chạy với user `ubuntu`** (setuid/setgid)
   - Working directory: `/tmp/mcp-workspace`
 
-### 5. Workspace Path cho Hugging Face ✅
-**File**: `config.py`
-- **Vấn đề**: Permission denied khi tạo `/data` trên HF Spaces
-- **Giải pháp**: Đổi workspace mặc định từ `/data` sang `/tmp/mcp-workspace`
+### 5. Workspace Path ✅
+**File**: `config.py`, `terminal.py`
+- **Workspace**: Giữ nguyên `/data` theo yêu cầu
+- **Terminal**: Chạy với user hiện tại (không phải ubuntu)
 
 ## Files đã thay đổi
 
