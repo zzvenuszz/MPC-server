@@ -449,20 +449,45 @@ def create_dashboard_app():
         name = request.match_info.get("name")
         data = await request.json()
         args = data.get("arguments", {})
+        
+        # Log để debug
+        logger.info(f"Testing tool: {name}, args: {args}, args_type: {type(args)}")
+        
         try:
             from server import mcp
             start = time.time()
-            result = await mcp.call_tool(name, args)
+            
+            # Log tool info trước khi gọi
+            logger.info(f"Calling mcp._tool_manager.call_tool('{name}', {args})")
+            
+            # FastMCP tools là sync functions, cần chạy trong executor
+            import asyncio
+            loop = asyncio.get_event_loop()
+            result = await loop.run_in_executor(
+                None,
+                lambda: mcp._tool_manager.call_tool(name, args)
+            )
+            
             duration = (time.time() - start) * 1000
             _tool_tracker.log_call(name, args, result, "success", duration)
+            
+            logger.info(f"Tool {name} executed successfully in {duration}ms")
+            
             return web.json_response({
                 "status": "success",
                 "result": str(result),
                 "duration_ms": round(duration, 2)
             })
         except Exception as e:
+            import traceback
+            error_detail = traceback.format_exc()
+            logger.error(f"Tool {name} failed: {str(e)}\n{error_detail}")
             _tool_tracker.log_call(name, args, None, "error", 0, str(e))
-            return web.json_response({"status": "error", "error": str(e)}, status=400)
+            return web.json_response({
+                "status": "error", 
+                "error": str(e),
+                "detail": error_detail
+            }, status=400)
 
     async def api_server_status(request):
         """GET /api/status - Lấy trạng thái server"""
@@ -803,20 +828,45 @@ def get_starlette_routes():
         name = request.path_params.get("name")
         data = await request.json()
         args = data.get("arguments", {})
+        
+        # Log để debug
+        logger.info(f"[Starlette] Testing tool: {name}, args: {args}, args_type: {type(args)}")
+        
         try:
             from server import mcp
             start = time.time()
-            result = await mcp.call_tool(name, args)
+            
+            # Log tool info trước khi gọi
+            logger.info(f"[Starlette] Calling mcp._tool_manager.call_tool('{name}', {args})")
+            
+            # FastMCP tools là sync functions, cần chạy trong executor
+            import asyncio
+            loop = asyncio.get_event_loop()
+            result = await loop.run_in_executor(
+                None,
+                lambda: mcp._tool_manager.call_tool(name, args)
+            )
+            
             duration = (time.time() - start) * 1000
             _tool_tracker.log_call(name, args, result, "success", duration)
+            
+            logger.info(f"[Starlette] Tool {name} executed successfully in {duration}ms")
+            
             return JSONResponse({
                 "status": "success",
                 "result": str(result),
                 "duration_ms": round(duration, 2)
             })
         except Exception as e:
+            import traceback
+            error_detail = traceback.format_exc()
+            logger.error(f"[Starlette] Tool {name} failed: {str(e)}\n{error_detail}")
             _tool_tracker.log_call(name, args, None, "error", 0, str(e))
-            return JSONResponse({"status": "error", "error": str(e)}, status_code=400)
+            return JSONResponse({
+                "status": "error", 
+                "error": str(e),
+                "detail": error_detail
+            }, status_code=400)
     
     async def api_server_status(request):
         """GET /api/status - Lấy trạng thái server"""
