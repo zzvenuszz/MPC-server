@@ -1129,6 +1129,9 @@
             if (page === 'tools') loadTools();
             if (page === 'config') loadConfig();
             if (page === 'keys') loadKeys();
+            // Render existing data when navigating to logs/tool-usage
+            if (page === 'logs') renderAllLogs();
+            if (page === 'tool-usage') renderAllToolCalls();
         }
 
         // ============================================================
@@ -1278,6 +1281,29 @@
             }
         }
 
+        function renderAllLogs() {
+            const container = document.getElementById('log-container');
+            container.innerHTML = '';
+            const logsToRender = state.logFilter === 'ALL' 
+                ? state.logs 
+                : state.logs.filter(l => l.level === state.logFilter);
+            
+            logsToRender.forEach(log => {
+                const entry = document.createElement('div');
+                entry.className = 'log-entry';
+                entry.innerHTML = `
+                    <span class="log-time">${new Date(log.timestamp).toLocaleTimeString()}</span>
+                    <span class="log-level ${log.level}">${log.level}</span>
+                    <span class="log-msg">${escapeHtml(log.message)}</span>
+                `;
+                container.appendChild(entry);
+            });
+
+            if (state.autoScroll) {
+                container.scrollTop = container.scrollHeight;
+            }
+        }
+
         function escapeHtml(text) {
             const div = document.createElement('div');
             div.textContent = text;
@@ -1356,6 +1382,10 @@
             }
         }
 
+        function renderAllToolCalls() {
+            renderToolUsage();
+        }
+
         function renderToolUsage() {
             const list = document.getElementById('tool-usage-list');
             list.innerHTML = '';
@@ -1430,7 +1460,7 @@
         // ============================================================
         // TEST TOOL MODAL
         // ============================================================
-        function openTestModal(toolName) {
+        async function openTestModal(toolName) {
             state.testingTool = toolName;
             document.getElementById('test-tool-name').textContent = toolName;
             document.getElementById('test-result').style.display = 'none';
@@ -1441,25 +1471,147 @@
 
             if (tool && tool.input_schema && tool.input_schema.properties) {
                 const props = tool.input_schema.properties;
+                const required = tool.input_schema.required || [];
+                
                 Object.entries(props).forEach(([key, prop]) => {
                     const group = document.createElement('div');
                     group.className = 'form-group';
                     const type = prop.type || 'string';
+                    const isRequired = required.includes(key);
                     const placeholder = prop.description || key;
+                    
+                    // Determine default value based on parameter name and type
+                    let defaultValue = prop.default !== undefined ? prop.default : getDefaultValue(key, type, toolName);
+                    
                     group.innerHTML = `
-                        <label>${key} <span style="color:var(--text-muted)">(${type})</span></label>
+                        <label>${key} <span style="color:var(--text-muted)">(${type})${isRequired ? ' *' : ''}</span></label>
                         <input type="${type === 'integer' || type === 'number' ? 'number' : 'text'}"
                             id="test-param-${key}" placeholder="${placeholder}"
-                            ${prop.default !== undefined ? `value="${prop.default}"` : ''}>
+                            value="${defaultValue}">
                         ${prop.description ? `<div class="help-text">${prop.description}</div>` : ''}
+                        ${isRequired ? '<div class="help-text" style="color:var(--error)">Required</div>' : ''}
                     `;
                     form.appendChild(group);
                 });
+                
+                // Auto-create test file for file operations
+                if (['read_file', 'write_file', 'replace_text'].includes(toolName)) {
+                    const filePathInput = document.getElementById('test-param-file_path');
+                    if (filePathInput && filePathInput.value) {
+                        await ensureTestFileExists(filePathInput.value);
+                    }
+                }
             } else {
                 form.innerHTML = '<div style="color:var(--text-muted)">No parameters required</div>';
             }
 
             document.getElementById('test-modal').classList.add('active');
+        }
+
+        function getDefaultValue(key, type, toolName) {
+            // Provide sensible defaults for common parameters
+            const lowerKey = key.toLowerCase();
+            const lowerTool = toolName.toLowerCase();
+            
+            // File path parameters
+            if (lowerKey.includes('file') && lowerKey.includes('path')) {
+                return '/data/test.txt';
+            }
+            if (lowerKey.includes('directory') || lowerKey.includes('dir') || lowerKey.includes('path')) {
+                return '/data';
+            }
+            if (lowerKey === 'file_path') {
+                return '/data/test.txt';
+            }
+            
+            // Content parameters
+            if (lowerKey === 'content') {
+                return 'Test content from dashboard';
+            }
+            if (lowerKey === 'old_text') {
+                return 'old text';
+            }
+            if (lowerKey === 'new_text') {
+                return 'new text';
+            }
+            
+            // Search parameters
+            if (lowerKey === 'search_text' || lowerKey === 'query') {
+                return 'test';
+            }
+            if (lowerKey === 'pattern') {
+                return '*.py';
+            }
+            
+            // Text parameters
+            if (type === 'string') {
+                if (lowerKey.includes('name')) {
+                    return 'test_name';
+                }
+                if (lowerKey.includes('description')) {
+                    return 'Test description';
+                }
+                if (lowerKey.includes('command')) {
+                    return 'ls';
+                }
+                return 'test';
+            }
+            
+            // Number parameters
+            if (type === 'integer' || type === 'number') {
+                if (lowerKey.includes('max') || lowerKey.includes('limit') || lowerKey.includes('count')) {
+                    return '10';
+                }
+                if (lowerKey.includes('port')) {
+                    return '8080';
+                }
+                if (lowerKey.includes('timeout')) {
+                    return '30';
+                }
+                return '1';
+            }
+            
+            // Boolean parameters
+            if (type === 'boolean') {
+                return 'false';
+            }
+            
+            return '';
+        }
+
+        async function ensureTestFileExists(filePath) {
+            // Create a test file if it doesn't exist
+            try {
+                const response = await fetch('/api/tools/read_file', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ file_path: filePath })
+                });
+                
+                if (response.ok) {
+                    // File exists, return
+                    return;
+                }
+                
+                // File doesn't exist, create it
+                const testContent = `This is a test file created by MCP Dashboard.
+Created at: ${new Date().toISOString()}
+Purpose: Testing file operations
+
+You can modify this file or delete it after testing.
+`;
+                
+                await fetch('/api/tools/write_file', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        file_path: filePath,
+                        content: testContent
+                    })
+                });
+            } catch (e) {
+                console.error('Failed to ensure test file exists:', e);
+            }
         }
 
         function closeTestModal() {
@@ -1471,18 +1623,35 @@
             const name = state.testingTool;
             const tool = state.tools.find(t => t.name === name);
             const args = {};
+            const missingRequired = [];
 
             if (tool && tool.input_schema && tool.input_schema.properties) {
+                const required = tool.input_schema.required || [];
+                
                 Object.keys(tool.input_schema.properties).forEach(key => {
                     const input = document.getElementById(`test-param-${key}`);
-                    if (input && input.value) {
-                        const prop = tool.input_schema.properties[key];
-                        if (prop.type === 'integer') args[key] = parseInt(input.value);
-                        else if (prop.type === 'number') args[key] = parseFloat(input.value);
-                        else if (prop.type === 'boolean') args[key] = input.value === 'true';
-                        else args[key] = input.value;
+                    const prop = tool.input_schema.properties[key];
+                    
+                    if (input) {
+                        // Check if required field is missing
+                        if (required.includes(key) && !input.value) {
+                            missingRequired.push(key);
+                        }
+                        
+                        if (input.value) {
+                            if (prop.type === 'integer') args[key] = parseInt(input.value);
+                            else if (prop.type === 'number') args[key] = parseFloat(input.value);
+                            else if (prop.type === 'boolean') args[key] = input.value === 'true';
+                            else args[key] = input.value;
+                        }
                     }
                 });
+                
+                // Validate required fields
+                if (missingRequired.length > 0) {
+                    showToast(`❌ Missing required fields: ${missingRequired.join(', ')}`, 'error');
+                    return;
+                }
             }
 
             try {
