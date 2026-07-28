@@ -39,8 +39,16 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PATH="/app:${PATH}"
 
-# Install sudo for user ubuntu
-RUN apt-get update && apt-get install -y --no-install-recommends sudo && rm -rf /var/lib/apt/lists/*
+# Install essential tools: sudo, git, nano, curl, wget, ca-certificates, procps
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    sudo \
+    git \
+    nano \
+    curl \
+    wget \
+    ca-certificates \
+    procps \
+    && rm -rf /var/lib/apt/lists/*
 
 # Create non-root user (ubuntu) with UID 1000 to match /data owner
 RUN groupadd -r ubuntu && useradd -r -g ubuntu -u 1000 -d /app -s /bin/bash ubuntu && \
