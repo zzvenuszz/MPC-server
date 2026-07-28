@@ -39,8 +39,8 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PATH="/app:${PATH}"
 
-# Create non-root user (ubuntu)
-RUN groupadd -r ubuntu && useradd -r -g ubuntu -d /app -s /bin/bash ubuntu
+# Create non-root user (ubuntu) with UID 1000 to match /data owner
+RUN groupadd -r ubuntu && useradd -r -g ubuntu -u 1000 -d /app -s /bin/bash ubuntu
 
 # Set workdir
 WORKDIR /app
