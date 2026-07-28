@@ -30,7 +30,7 @@
   - Tích hợp REST API endpoints: `/api/terminal/*`
   - Frontend sử dụng xterm.js cho terminal emulation
   - Real bash shell với đầy đủ tính năng (Ctrl+C, persistent session)
-  - **User**: Terminal chạy với user `ubuntu` (đã cấu hình trong Dockerfile)
+  - **User**: Terminal chạy với user `ubuntu` (UID 1000, có sudo NOPASSWD)
   - Working directory: `/data`
 
 
@@ -41,7 +41,7 @@
 3. `dashboard.py` - Terminal API routes với authentication
 4. `terminal.py` - Mới: PTY-based terminal module
 5. `dashboard_static/index.html` - Terminal UI với xterm.js
-6. `Dockerfile` - Đổi user từ `mcpuser` sang `ubuntu`, tạo và cấp quyền `/data` (chmod 755)
+6. `Dockerfile` - User `ubuntu` (UID 1000), cài sudo, cấp quyền sudo NOPASSWD, tạo và cấp quyền `/data` (chmod 755)
 
 ## Cách Deploy lên Hugging Face Spaces
 
@@ -49,7 +49,7 @@
 
 ```bash
 git add .
-git commit -m "fix: terminal, dashboard stats, test tool, workspace path"
+git commit -m "fix: terminal PTY with ubuntu sudo, dashboard stats, test tool"
 git push origin main
 ```
 
@@ -90,6 +90,7 @@ Sau khi push code, restart Hugging Face Space để áp dụng thay đổi.
 - Persistent session (giữ nguyên khi chuyển tab)
 - Support Ctrl+C, Ctrl+Z, etc.
 - Working directory: `/data`
+- User: `ubuntu` với quyền sudo (NOPASSWD)
 
 ### Test Tool
 1. Vào tab "Tools"
@@ -104,6 +105,7 @@ Sau khi push code, restart Hugging Face Space để áp dụng thay đổi.
 2. **Workspace**: Tất cả file operations dùng `/data`
 3. **Shell commands**: Chỉ chạy được commands trong `allowed_shell_commands`
 4. **No persistent storage**: Trên HF Spaces, dữ liệu sẽ mất khi restart
+5. **User ubuntu**: Có quyền sudo (NOPASSWD) để cài đặt phần mềm
 
 ## Troubleshooting
 
@@ -120,6 +122,10 @@ Sau khi push code, restart Hugging Face Space để áp dụng thay đổi.
 ### Test tool lỗi validation
 - Kiểm tra required fields đã được điền chưa
 - Xem log để debug arguments được gửi
+
+### User ubuntu không có quyền sudo
+- Kiểm tra Dockerfile có dòng `echo "ubuntu ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers`
+- Restart Space để rebuild image
 
 ## Technical Details
 
@@ -147,3 +153,4 @@ MCP Server (FastMCP)
 2. Shell commands bị giới hạn bởi `allowed_shell_commands`
 3. File operations bị giới hạn bởi workspace path
 4. API keys được mask (hiển thị chỉ 4 ký tự cuối)
+5. User ubuntu có sudo NOPASSWD (chỉ dùng trong môi trường container)
