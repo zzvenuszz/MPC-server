@@ -33,6 +33,12 @@
   - **User**: Terminal chạy với user `ubuntu` (UID 1000, có sudo NOPASSWD)
   - Working directory: `/data`
 
+### 5. Rate Limit 429 ✅
+**File**: `dashboard_static/index.html`
+- **Vấn đề**: Terminal polling 50ms = 20 requests/giây gây rate limit trên HF Spaces
+- **Giải pháp**: Tăng polling interval từ 50ms lên 100ms (10 requests/giây)
+- **Lưu ý**: 429 rate limit là do HF Spaces, không phải trong mã nguồn
+
 
 ## Files đã thay đổi
 
@@ -40,7 +46,7 @@
 2. `config.py` - Workspace `/data`
 3. `dashboard.py` - Terminal API routes với authentication
 4. `terminal.py` - Mới: PTY-based terminal module
-5. `dashboard_static/index.html` - Terminal UI với xterm.js
+5. `dashboard_static/index.html` - Terminal UI với xterm.js, tăng polling 100ms
 6. `Dockerfile` - User `ubuntu` (UID 1000), cài sudo, cấp quyền sudo NOPASSWD, tạo và cấp quyền `/data` (chmod 755)
 
 ## Cách Deploy lên Hugging Face Spaces
@@ -49,7 +55,7 @@
 
 ```bash
 git add .
-git commit -m "fix: terminal PTY with ubuntu sudo, dashboard stats, test tool"
+git commit -m "fix: terminal PTY, polling 100ms, dashboard stats, test tool"
 git push origin main
 ```
 
@@ -91,6 +97,7 @@ Sau khi push code, restart Hugging Face Space để áp dụng thay đổi.
 - Support Ctrl+C, Ctrl+Z, etc.
 - Working directory: `/data`
 - User: `ubuntu` với quyền sudo (NOPASSWD)
+- Polling: 100ms (tránh rate limit 429)
 
 ### Test Tool
 1. Vào tab "Tools"
@@ -106,6 +113,7 @@ Sau khi push code, restart Hugging Face Space để áp dụng thay đổi.
 3. **Shell commands**: Chỉ chạy được commands trong `allowed_shell_commands`
 4. **No persistent storage**: Trên HF Spaces, dữ liệu sẽ mất khi restart
 5. **User ubuntu**: Có quyền sudo (NOPASSWD) để cài đặt phần mềm
+6. **Rate limit**: Terminal polling 100ms để tránh 429 trên HF Spaces
 
 ## Troubleshooting
 
@@ -127,12 +135,17 @@ Sau khi push code, restart Hugging Face Space để áp dụng thay đổi.
 - Kiểm tra Dockerfile có dòng `echo "ubuntu ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers`
 - Restart Space để rebuild image
 
+### Rate limit 429
+- 429 là do HF Spaces, không thể sửa trong code
+- Terminal polling đã được tăng từ 50ms lên 100ms
+- Chờ một thời gian rồi thử lại
+
 ## Technical Details
 
 ### Terminal Architecture
 ```
 Frontend (xterm.js)
-    ↓ REST API (polling 50ms)
+    ↓ REST API (polling 100ms)
 Backend (Starlette routes)
     ↓ PTY (os.fork + pty.openpty)
 Bash Shell (real bash process)

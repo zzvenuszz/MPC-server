@@ -2057,7 +2057,7 @@ You can modify this file or delete it after testing.
                 } catch (e) {
                     console.error('Terminal output poll error:', e);
                 }
-            }, 50); // Poll every 50ms
+            }, 100); // Poll every 100ms (tăng từ 50ms để tránh rate limit 429 trên HF Spaces)
         }
 
         function resetTerminal() {
