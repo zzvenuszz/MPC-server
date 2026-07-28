@@ -66,6 +66,29 @@
             height: 100vh;
             position: sticky;
             top: 0;
+            transition: transform 0.3s ease;
+        }
+
+        .sidebar-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 998;
+        }
+
+        .sidebar-overlay.active {
+            display: block;
+        }
+
+        .mobile-menu-btn {
+            display: none;
+            background: none;
+            border: none;
+            color: var(--text-primary);
+            font-size: 24px;
+            cursor: pointer;
+            padding: 8px;
         }
 
         .sidebar-header {
@@ -206,6 +229,12 @@
             justify-content: space-between;
             padding: 0 24px;
             flex-shrink: 0;
+        }
+
+        .topbar-left {
+            display: flex;
+            align-items: center;
+            gap: 12px;
         }
 
         .topbar .page-title {
@@ -674,14 +703,33 @@
            ============================================================ */
         @media (max-width: 768px) {
             .sidebar {
-                display: none;
+                position: fixed;
+                left: 0;
+                top: 0;
+                z-index: 999;
+                transform: translateX(-100%);
             }
+
+            .sidebar.active {
+                transform: translateX(0);
+            }
+
+            .sidebar-overlay.active {
+                display: block;
+            }
+
+            .mobile-menu-btn {
+                display: block;
+            }
+
             .stats-grid {
                 grid-template-columns: 1fr 1fr;
             }
+
             .tools-grid {
                 grid-template-columns: 1fr;
             }
+
             .config-grid {
                 grid-template-columns: 1fr;
             }
@@ -909,11 +957,17 @@
     ============================================================ -->
     <div class="main-content">
         <header class="topbar">
-            <div class="page-title" id="page-title">Dashboard</div>
+            <div class="topbar-left">
+                <button class="mobile-menu-btn" onclick="toggleMobileMenu()">☰</button>
+                <div class="page-title" id="page-title">Dashboard</div>
+            </div>
             <div class="actions">
                 <button class="btn btn-sm" onclick="location.reload()">🔄 Refresh</button>
             </div>
         </header>
+
+        <!-- Mobile sidebar overlay -->
+        <div class="sidebar-overlay" id="sidebar-overlay" onclick="toggleMobileMenu()"></div>
 
         <div class="content-area">
             <!-- ============================================================
@@ -966,31 +1020,32 @@
                 </div>
             </div>
 
-            <!-- ============================================================
-            PAGE: LOGS
-            ============================================================ -->
-            <div class="page hidden" id="page-logs">
-                <div class="card">
-                    <div class="card-header">
-                        <div>
-                            <div class="card-title">Real-time Logs</div>
-                            <div class="card-subtitle">Log stream từ MCP Server</div>
-                        </div>
-                        <div>
-                            <button class="btn btn-sm" onclick="clearLogs()">🗑️ Clear</button>
-                            <button class="btn btn-sm" onclick="toggleLogAutoScroll()" id="autoscroll-btn">📌 Auto-scroll</button>
-                        </div>
+        <!-- ============================================================
+        PAGE: LOGS
+        ============================================================ -->
+        <div class="page hidden" id="page-logs">
+            <div class="card">
+                <div class="card-header">
+                    <div>
+                        <div class="card-title">Real-time Logs</div>
+                        <div class="card-subtitle">Log stream từ MCP Server</div>
                     </div>
-                    <div class="log-filter" id="log-filters">
-                        <button class="filter-btn active" data-level="ALL">All</button>
-                        <button class="filter-btn" data-level="INFO">INFO</button>
-                        <button class="filter-btn" data-level="WARNING">WARN</button>
-                        <button class="filter-btn" data-level="ERROR">ERROR</button>
-                        <button class="filter-btn" data-level="DEBUG">DEBUG</button>
+                    <div>
+                        <button class="btn btn-sm" onclick="copySelectedLogs()">📋 Copy</button>
+                        <button class="btn btn-sm" onclick="clearLogs()">🗑️ Clear</button>
+                        <button class="btn btn-sm" onclick="toggleLogAutoScroll()" id="autoscroll-btn">📌 Auto-scroll</button>
                     </div>
-                    <div class="log-container" id="log-container"></div>
                 </div>
+                <div class="log-filter" id="log-filters">
+                    <button class="filter-btn active" data-level="ALL">All</button>
+                    <button class="filter-btn" data-level="INFO">INFO</button>
+                    <button class="filter-btn" data-level="WARNING">WARN</button>
+                    <button class="filter-btn" data-level="ERROR">ERROR</button>
+                    <button class="filter-btn" data-level="DEBUG">DEBUG</button>
+                </div>
+                <div class="log-container" id="log-container"></div>
             </div>
+        </div>
 
             <!-- ============================================================
             PAGE: TOOL USAGE
@@ -1060,23 +1115,24 @@
         </div>
     </div>
 
-    <!-- ============================================================
-    MODAL: TEST TOOL
-    ============================================================ -->
-    <div class="modal-overlay" id="test-modal">
-        <div class="modal">
-            <h2>🧪 Test Tool: <span id="test-tool-name"></span></h2>
-            <div id="test-tool-form"></div>
-            <div id="test-result" style="margin-top:12px;display:none;">
-                <div class="card-title">Result:</div>
-                <pre style="background:var(--bg-input);padding:12px;border-radius:var(--radius-sm);margin-top:8px;font-size:12px;overflow-x:auto;" id="test-result-content"></pre>
-            </div>
-            <div class="modal-actions">
-                <button class="btn" onclick="closeTestModal()">Cancel</button>
-                <button class="btn btn-primary" onclick="runTestTool()">▶️ Run Test</button>
+        <!-- ============================================================
+        MODAL: TEST TOOL
+        ============================================================ -->
+        <div class="modal-overlay" id="test-modal">
+            <div class="modal">
+                <h2>🧪 Test Tool: <span id="test-tool-name"></span></h2>
+                <div id="test-tool-form"></div>
+                <div id="test-result" style="margin-top:12px;display:none;">
+                    <div class="card-title">Result:</div>
+                    <pre style="background:var(--bg-input);padding:12px;border-radius:var(--radius-sm);margin-top:8px;font-size:12px;overflow-x:auto;max-height:400px;overflow-y:auto;" id="test-result-content"></pre>
+                    <button class="btn btn-sm" style="margin-top:8px;" onclick="copyTestResult()">📋 Copy Result</button>
+                </div>
+                <div class="modal-actions">
+                    <button class="btn" onclick="closeTestModal()">Cancel</button>
+                    <button class="btn btn-primary" onclick="runTestTool()">▶️ Run Test</button>
+                </div>
             </div>
         </div>
-    </div>
 
     <!-- ============================================================
     TOAST CONTAINER
@@ -1109,8 +1165,19 @@
             item.addEventListener('click', () => {
                 const page = item.dataset.page;
                 navigateTo(page);
+                // Close mobile menu after navigation
+                if (window.innerWidth <= 768) {
+                    toggleMobileMenu();
+                }
             });
         });
+
+        function toggleMobileMenu() {
+            const sidebar = document.querySelector('.sidebar');
+            const overlay = document.getElementById('sidebar-overlay');
+            sidebar.classList.toggle('active');
+            overlay.classList.toggle('active');
+        }
 
         function navigateTo(page) {
             state.currentPage = page;
@@ -1236,6 +1303,25 @@
         // ============================================================
         let logWs = null;
 
+        function copyLogs() {
+            const logs = state.logs.map(log => 
+                `[${log.timestamp}] [${log.level}] ${log.message}`
+            ).join('\n');
+            
+            navigator.clipboard.writeText(logs).then(() => {
+                showToast('✅ Logs copied to clipboard', 'success');
+            }).catch(err => {
+                showToast('❌ Failed to copy logs', 'error');
+                console.error('Copy failed:', err);
+            });
+        }
+
+        function clearLogs() {
+            state.logs = [];
+            document.getElementById('log-container').innerHTML = '';
+            document.getElementById('log-count').textContent = '0';
+        }
+
         function connectLogStream() {
             if (logWs) logWs.close();
             const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -1314,6 +1400,30 @@
             state.logs = [];
             document.getElementById('log-container').innerHTML = '';
             document.getElementById('log-count').textContent = '0';
+        }
+
+        function copySelectedLogs() {
+            const container = document.getElementById('log-container');
+            const selectedLogs = [];
+            
+            container.querySelectorAll('.log-entry').forEach(entry => {
+                const time = entry.querySelector('.log-time')?.textContent || '';
+                const level = entry.querySelector('.log-level')?.textContent || '';
+                const msg = entry.querySelector('.log-msg')?.textContent || '';
+                selectedLogs.push(`[${time}] [${level}] ${msg}`);
+            });
+            
+            if (selectedLogs.length === 0) {
+                showToast('⚠️ No logs to copy', 'info');
+                return;
+            }
+            
+            navigator.clipboard.writeText(selectedLogs.join('\n')).then(() => {
+                showToast(`✅ Copied ${selectedLogs.length} logs to clipboard`, 'success');
+            }).catch(err => {
+                showToast('❌ Failed to copy logs', 'error');
+                console.error('Copy failed:', err);
+            });
         }
 
         function toggleLogAutoScroll() {
@@ -1469,9 +1579,14 @@
             const form = document.getElementById('test-tool-form');
             form.innerHTML = '';
 
+            console.log(`Opening test modal for ${toolName}:`, tool);
+
             if (tool && tool.input_schema && tool.input_schema.properties) {
                 const props = tool.input_schema.properties;
                 const required = tool.input_schema.required || [];
+                
+                console.log(`Tool ${toolName} has properties:`, Object.keys(props));
+                console.log(`Required fields:`, required);
                 
                 Object.entries(props).forEach(([key, prop]) => {
                     const group = document.createElement('div');
@@ -1482,6 +1597,8 @@
                     
                     // Determine default value based on parameter name and type
                     let defaultValue = prop.default !== undefined ? prop.default : getDefaultValue(key, type, toolName);
+                    
+                    console.log(`Creating input for ${key}: defaultValue="${defaultValue}"`);
                     
                     group.innerHTML = `
                         <label>${key} <span style="color:var(--text-muted)">(${type})${isRequired ? ' *' : ''}</span></label>
@@ -1502,6 +1619,7 @@
                     }
                 }
             } else {
+                console.log(`Tool ${toolName} has no parameters`);
                 form.innerHTML = '<div style="color:var(--text-muted)">No parameters required</div>';
             }
 
@@ -1622,6 +1740,21 @@ You can modify this file or delete it after testing.
             state.testingTool = null;
         }
 
+        function copyTestResult() {
+            const resultText = document.getElementById('test-result-content').textContent;
+            if (!resultText) {
+                showToast('⚠️ No result to copy', 'info');
+                return;
+            }
+            
+            navigator.clipboard.writeText(resultText).then(() => {
+                showToast('✅ Result copied to clipboard', 'success');
+            }).catch(err => {
+                showToast('❌ Failed to copy result', 'error');
+                console.error('Copy failed:', err);
+            });
+        }
+
         async function runTestTool() {
             const name = state.testingTool;
             const tool = state.tools.find(t => t.name === name);
@@ -1631,9 +1764,13 @@ You can modify this file or delete it after testing.
             if (tool && tool.input_schema && tool.input_schema.properties) {
                 const required = tool.input_schema.required || [];
                 
+                console.log(`Testing ${name}, properties:`, tool.input_schema.properties);
+                
                 Object.keys(tool.input_schema.properties).forEach(key => {
                     const input = document.getElementById(`test-param-${key}`);
                     const prop = tool.input_schema.properties[key];
+                    
+                    console.log(`Parameter ${key}: input=${input?.value}, type=${prop?.type}`);
                     
                     if (input) {
                         // Check if required field is missing
@@ -1650,9 +1787,18 @@ You can modify this file or delete it after testing.
                     }
                 });
                 
+                console.log(`Final args for ${name}:`, args);
+                console.log(`Missing required:`, missingRequired);
+                
                 // Validate required fields
                 if (missingRequired.length > 0) {
                     showToast(`❌ Missing required fields: ${missingRequired.join(', ')}`, 'error');
+                    return;
+                }
+                
+                // Double check: if args is empty but tool requires parameters, show error
+                if (Object.keys(args).length === 0 && required.length > 0) {
+                    showToast(`❌ Tool requires parameters but none were provided`, 'error');
                     return;
                 }
             }
@@ -1910,6 +2056,14 @@ You can modify this file or delete it after testing.
             const isAuth = checkAuth();
             
             if (isAuth) {
+                // Load tools count immediately
+                try {
+                    const tools = await apiGet('/api/tools');
+                    document.getElementById('tools-count').textContent = tools.length;
+                } catch (e) {
+                    console.error('Failed to load tools count:', e);
+                }
+                
                 // Load overview first
                 await loadOverview();
                 // Connect WebSockets

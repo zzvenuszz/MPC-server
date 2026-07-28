@@ -192,13 +192,25 @@ def _get_tools_list():
         
         tools = []
         for tool in _mcp_instance._tool_manager.list_tools():
+            # Lấy input_schema đúng cách từ FastMCP
+            input_schema = {}
+            if hasattr(tool, 'input_schema'):
+                input_schema = tool.input_schema
+            elif hasattr(tool, 'fn_metadata') and hasattr(tool.fn_metadata, 'arg_model'):
+                # FastMCP stores schema in arg_model
+                try:
+                    input_schema = tool.fn_metadata.arg_model.model_json_schema()
+                except Exception:
+                    pass
+            
             tools.append({
                 "name": tool.name,
                 "description": tool.description or "",
-                "input_schema": tool.input_schema if hasattr(tool, 'input_schema') else {},
+                "input_schema": input_schema,
             })
         return tools
     except Exception as e:
+        logger.error(f"Error getting tools list: {e}")
         return [{"name": f"error: {e}", "description": "", "input_schema": {}}]
 
 
