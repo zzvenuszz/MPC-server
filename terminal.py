@@ -63,8 +63,8 @@ def create_terminal_session(session_id: str, cols: int = 80, rows: int = 24, cwd
             os.environ["TERM"] = "xterm-256color"
             os.environ["HOME"] = os.path.expanduser("~")
             os.environ["SHELL"] = "/bin/bash"
-            os.environ["USER"] = os.environ.get("USER", "mcpuser")
-            os.environ["LOGNAME"] = os.environ.get("LOGNAME", "mcpuser")
+            os.environ["USER"] = "ubuntu"
+            os.environ["LOGNAME"] = "ubuntu"
             
             # Execute bash (interactive, login shell)
             try:

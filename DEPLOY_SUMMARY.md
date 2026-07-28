@@ -30,19 +30,18 @@
   - Tích hợp REST API endpoints: `/api/terminal/*`
   - Frontend sử dụng xterm.js cho terminal emulation
   - Real bash shell với đầy đủ tính năng (Ctrl+C, persistent session)
-  - **User**: Terminal sẽ chạy với user hiện tại (mcpuser trên HF Spaces)
-    - Code đã thử `setuid` sang `ubuntu`, `sudo`, và `su`
-    - Trên HF Spaces không có quyền root nên fallback về user hiện tại
+  - **User**: Terminal chạy với user `ubuntu` (đã cấu hình trong Dockerfile)
   - Working directory: `/data`
 
 
 ## Files đã thay đổi
 
 1. `tools/minecraft/paper_reference.py` - Sửa import error
-2. `config.py` - Đổi workspace path
-3. `dashboard.py` - Thêm terminal API routes với authentication
+2. `config.py` - Workspace `/data`
+3. `dashboard.py` - Terminal API routes với authentication
 4. `terminal.py` - Mới: PTY-based terminal module
 5. `dashboard_static/index.html` - Terminal UI với xterm.js
+6. `Dockerfile` - Đổi user từ `mcpuser` sang `ubuntu`, cấp quyền `/data`
 
 ## Cách Deploy lên Hugging Face Spaces
 

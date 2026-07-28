@@ -39,8 +39,8 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PATH="/app:${PATH}"
 
-# Create non-root user
-RUN groupadd -r mcpuser && useradd -r -g mcpuser -d /app -s /bin/bash mcpuser
+# Create non-root user (ubuntu)
+RUN groupadd -r ubuntu && useradd -r -g ubuntu -d /app -s /bin/bash ubuntu
 
 # Set workdir
 WORKDIR /app
@@ -49,13 +49,16 @@ WORKDIR /app
 COPY --from=builder /install /usr/local
 
 # Copy source code
-COPY --chown=mcpuser:mcpuser . .
+COPY --chown=ubuntu:ubuntu . .
 
 # Create logs directory
-RUN mkdir -p /app/logs && chown -R mcpuser:mcpuser /app/logs
+RUN mkdir -p /app/logs && chown -R ubuntu:ubuntu /app/logs
+
+# Create workspace directory and grant permissions
+RUN mkdir -p /data && chown -R ubuntu:ubuntu /data
 
 # Switch to non-root user
-USER mcpuser
+USER ubuntu
 
 # Expose port cho MCP Server (HF Spaces dùng port 8080)
 EXPOSE 8080
