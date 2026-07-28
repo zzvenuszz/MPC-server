@@ -41,7 +41,7 @@
 3. `dashboard.py` - Terminal API routes với authentication
 4. `terminal.py` - Mới: PTY-based terminal module
 5. `dashboard_static/index.html` - Terminal UI với xterm.js
-6. `Dockerfile` - Đổi user từ `mcpuser` sang `ubuntu`, cấp quyền `/data` (chmod 755, không tạo mới)
+6. `Dockerfile` - Đổi user từ `mcpuser` sang `ubuntu`, tạo và cấp quyền `/data` (chmod 755)
 
 ## Cách Deploy lên Hugging Face Spaces
 

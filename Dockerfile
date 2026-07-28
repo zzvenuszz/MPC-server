@@ -54,8 +54,8 @@ COPY --chown=ubuntu:ubuntu . .
 # Create logs directory
 RUN mkdir -p /app/logs && chown -R ubuntu:ubuntu /app/logs
 
-# Grant permissions for existing /data directory
-RUN chown -R ubuntu:ubuntu /data && chmod 755 /data
+# Create and grant permissions for /data directory
+RUN mkdir -p /data && chown -R ubuntu:ubuntu /data && chmod 755 /data
 
 # Switch to non-root user
 USER ubuntu
