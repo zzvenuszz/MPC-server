@@ -980,6 +980,72 @@ def get_starlette_routes():
             }
         })
     
+    async def api_console_execute(request):
+        """POST /api/console/execute - Execute shell command (requires auth)"""
+        # Check authentication
+        auth_cookie = request.cookies.get('dashboard_auth')
+        if not auth_cookie or auth_cookie != 'authenticated':
+            return JSONResponse({"error": "Unauthorized"}, status_code=401)
+        
+        try:
+            data = await request.json()
+            command = data.get('command', '').strip()
+            
+            if not command:
+                return JSONResponse({"error": "Command is required"}, status_code=400)
+            
+            # Validate command against allowed list
+            from config import get_settings
+            settings = get_settings()
+            
+            if not settings.allow_shell:
+                return JSONResponse({"error": "Shell commands are disabled"}, status_code=403)
+            
+            # Check if command is allowed
+            cmd_name = command.split()[0] if command else ""
+            allowed_commands = settings.allowed_shell_commands
+            
+            if cmd_name not in allowed_commands:
+                return JSONResponse({
+                    "error": f"Command '{cmd_name}' is not allowed",
+                    "allowed_commands": allowed_commands
+                }, status_code=403)
+            
+            # Execute command
+            import subprocess
+            import shlex
+            
+            logger.info(f"Executing console command: {command}")
+            
+            # Run command with timeout
+            try:
+                result = subprocess.run(
+                    command,
+                    shell=True,
+                    capture_output=True,
+                    text=True,
+                    timeout=30,
+                    cwd=str(settings.workspace)
+                )
+                
+                return JSONResponse({
+                    "command": command,
+                    "stdout": result.stdout,
+                    "stderr": result.stderr,
+                    "return_code": result.returncode,
+                    "success": result.returncode == 0
+                })
+                
+            except subprocess.TimeoutExpired:
+                return JSONResponse({
+                    "error": "Command timed out (30s limit)",
+                    "command": command
+                }, status_code=408)
+                
+        except Exception as e:
+            logger.error(f"Console execution error: {e}")
+            return JSONResponse({"error": str(e)}, status_code=500)
+    
     async def dashboard_index(request):
         """Serve dashboard index.html"""
         static_dir = Path(__file__).parent / "dashboard_static"
@@ -1004,6 +1070,7 @@ def get_starlette_routes():
         Route("/api/keys", api_keys, methods=["GET"]),
         Route("/api/keys", api_keys_update, methods=["POST"]),
         Route("/api/status", api_server_status, methods=["GET"]),
+        Route("/api/console/execute", api_console_execute, methods=["POST"]),
         Mount("/static", app=StaticFiles(directory=str(Path(__file__).parent / "dashboard_static")), name="dashboard-static"),
     ])
     

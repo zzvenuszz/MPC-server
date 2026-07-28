@@ -8,7 +8,8 @@ from pathlib import Path
 import re
 
 from config import get_settings
-from utils import get_logger, MCPError, handle_exception, read_file_safe, search_text
+from utils import get_logger, MCPError, handle_exception, read_file_safe
+from tools.filesystem import search_text
 
 logger = get_logger()
 

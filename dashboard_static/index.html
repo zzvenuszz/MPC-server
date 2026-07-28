@@ -699,6 +699,82 @@
         }
 
         /* ============================================================
+           CONSOLE
+           ============================================================ */
+        .console-container {
+            background: #0a0a0a;
+            border-radius: var(--radius-sm);
+            padding: 16px;
+            font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
+            font-size: 13px;
+            line-height: 1.6;
+            min-height: 500px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .console-output {
+            flex: 1;
+            overflow-y: auto;
+            margin-bottom: 12px;
+            padding: 12px;
+            background: #000;
+            border-radius: var(--radius-sm);
+            border: 1px solid var(--border-color);
+        }
+
+        .console-line {
+            color: var(--text-primary);
+            margin-bottom: 4px;
+            word-break: break-all;
+        }
+
+        .console-line.command {
+            color: var(--info);
+        }
+
+        .console-line.error {
+            color: var(--error);
+        }
+
+        .console-line.success {
+            color: var(--success);
+        }
+
+        .console-line.info {
+            color: var(--info);
+        }
+
+        .console-input-line {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .console-prompt {
+            color: var(--success);
+            font-weight: bold;
+            font-size: 14px;
+        }
+
+        .console-input {
+            flex: 1;
+            background: var(--bg-input);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-sm);
+            padding: 8px 12px;
+            color: var(--text-primary);
+            font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
+            font-size: 13px;
+        }
+
+        .console-input:focus {
+            outline: none;
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px var(--accent-glow);
+        }
+
+        /* ============================================================
            RESPONSIVE
            ============================================================ */
         @media (max-width: 768px) {
@@ -915,6 +991,9 @@
                 <span class="icon">🛠️</span> Tools
                 <span class="badge" id="tools-count">0</span>
             </div>
+            <div class="nav-item" data-page="console">
+                <span class="icon">💻</span> Console
+            </div>
             <div class="nav-item" data-page="config">
                 <span class="icon">⚙️</span> Configuration
             </div>
@@ -1110,6 +1189,34 @@
                         <button class="btn btn-primary btn-sm" onclick="saveKeys()">💾 Save</button>
                     </div>
                     <div class="config-grid" id="keys-form"></div>
+                </div>
+            </div>
+
+            <!-- ============================================================
+            PAGE: CONSOLE
+            ============================================================ -->
+            <div class="page hidden" id="page-console">
+                <div class="card">
+                    <div class="card-header">
+                        <div>
+                            <div class="card-title">Console</div>
+                            <div class="card-subtitle">Terminal - Execute shell commands</div>
+                        </div>
+                        <button class="btn btn-sm" onclick="clearConsole()">🗑️ Clear</button>
+                    </div>
+                    <div class="console-container" id="console-container">
+                        <div class="console-output" id="console-output">
+                            <div class="console-line">Welcome to MCP Server Console</div>
+                            <div class="console-line">Type 'help' for available commands</div>
+                            <div class="console-line">Current directory: /data</div>
+                            <div class="console-line">---</div>
+                        </div>
+                        <div class="console-input-line">
+                            <span class="console-prompt">$</span>
+                            <input type="text" class="console-input" id="console-input" placeholder="Enter command..." autocomplete="off">
+                            <button class="btn btn-sm btn-primary" onclick="executeConsoleCommand()">▶️ Run</button>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -1865,6 +1972,80 @@ You can modify this file or delete it after testing.
         // Close modal on overlay click
         document.getElementById('test-modal').addEventListener('click', (e) => {
             if (e.target === e.currentTarget) closeTestModal();
+        });
+
+        // ============================================================
+        // CONSOLE
+        // ============================================================
+        async function executeConsoleCommand() {
+            const input = document.getElementById('console-input');
+            const command = input.value.trim();
+            
+            if (!command) return;
+            
+            const output = document.getElementById('console-output');
+            
+            // Add command to output
+            const cmdLine = document.createElement('div');
+            cmdLine.className = 'console-line command';
+            cmdLine.textContent = `$ ${command}`;
+            output.appendChild(cmdLine);
+            
+            // Clear input
+            input.value = '';
+            
+            try {
+                const result = await apiPost('/api/console/execute', { command });
+                
+                // Add output
+                if (result.stdout) {
+                    const stdoutLine = document.createElement('div');
+                    stdoutLine.className = 'console-line';
+                    stdoutLine.textContent = result.stdout;
+                    output.appendChild(stdoutLine);
+                }
+                
+                if (result.stderr) {
+                    const stderrLine = document.createElement('div');
+                    stderrLine.className = 'console-line error';
+                    stderrLine.textContent = result.stderr;
+                    output.appendChild(stderrLine);
+                }
+                
+                if (result.error) {
+                    const errorLine = document.createElement('div');
+                    errorLine.className = 'console-line error';
+                    errorLine.textContent = `Error: ${result.error}`;
+                    output.appendChild(errorLine);
+                }
+                
+                // Scroll to bottom
+                output.scrollTop = output.scrollHeight;
+                
+            } catch (e) {
+                const errorLine = document.createElement('div');
+                errorLine.className = 'console-line error';
+                errorLine.textContent = `Error: ${e.message || e.toString()}`;
+                output.appendChild(errorLine);
+                output.scrollTop = output.scrollHeight;
+            }
+        }
+
+        function clearConsole() {
+            const output = document.getElementById('console-output');
+            output.innerHTML = '<div class="console-line">Console cleared</div><div class="console-line">---</div>';
+        }
+
+        // Handle Enter key in console input
+        document.addEventListener('DOMContentLoaded', () => {
+            const consoleInput = document.getElementById('console-input');
+            if (consoleInput) {
+                consoleInput.addEventListener('keypress', (e) => {
+                    if (e.key === 'Enter') {
+                        executeConsoleCommand();
+                    }
+                });
+            }
         });
 
         // ============================================================
