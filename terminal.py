@@ -37,11 +37,28 @@ def create_terminal_session(session_id: str, cols: int = 80, rows: int = 24, cwd
         # Set window size
         set_winsize(master_fd, rows, cols)
         
+        # Get ubuntu user info
+        import pwd
+        try:
+            ubuntu_pw = pwd.getpwnam("ubuntu")
+            ubuntu_uid = ubuntu_pw.pw_uid
+            ubuntu_gid = ubuntu_pw.pw_gid
+            ubuntu_home = ubuntu_pw.pw_dir
+        except KeyError:
+            # Fallback to current user if ubuntu doesn't exist
+            ubuntu_uid = os.getuid()
+            ubuntu_gid = os.getgid()
+            ubuntu_home = os.path.expanduser("~")
+        
         # Fork child process
         pid = os.fork()
         if pid == 0:  # Child process
             os.close(master_fd)
             os.setsid()
+            
+            # Set user to ubuntu
+            os.setgid(ubuntu_gid)
+            os.setuid(ubuntu_uid)
             
             # Duplicate slave_fd to stdin, stdout, stderr
             os.dup2(slave_fd, 0)
@@ -57,8 +74,10 @@ def create_terminal_session(session_id: str, cols: int = 80, rows: int = 24, cwd
             
             # Set environment variables
             os.environ["TERM"] = "xterm-256color"
-            os.environ["HOME"] = os.path.expanduser("~")
+            os.environ["HOME"] = ubuntu_home
             os.environ["SHELL"] = "/bin/bash"
+            os.environ["USER"] = "ubuntu"
+            os.environ["LOGNAME"] = "ubuntu"
             
             # Execute bash
             os.execve("/bin/bash", ["/bin/bash", "--login"], os.environ)

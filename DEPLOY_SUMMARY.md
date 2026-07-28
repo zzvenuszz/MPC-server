@@ -31,12 +31,8 @@
   - Frontend sử dụng xterm.js cho terminal emulation
   - Real bash shell với đầy đủ tính năng (Ctrl+C, persistent session)
   - **Chạy với user `ubuntu`** (setuid/setgid)
-  - Working directory: `/tmp/mcp-workspace`
+  - Working directory: `/data`
 
-### 5. Workspace Path ✅
-**File**: `config.py`, `terminal.py`
-- **Workspace**: Giữ nguyên `/data` theo yêu cầu
-- **Terminal**: Chạy với user hiện tại (không phải ubuntu)
 
 ## Files đã thay đổi
 
