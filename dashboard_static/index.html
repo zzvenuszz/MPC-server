@@ -4,6 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>MCP Server Dashboard</title>
+    <!-- xterm.js for terminal emulation -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.min.js"></script>
     <style>
         /* ============================================================
            CSS VARIABLES & THEME
@@ -1200,35 +1204,23 @@
                 </div>
             </div>
 
-            <!-- ============================================================
-            PAGE: CONSOLE
-            ============================================================ -->
-            <div class="page hidden" id="page-console">
-                <div class="card" style="padding: 0; overflow: hidden;">
-                    <div class="card-header" style="padding: 16px 20px; margin: 0;">
-                        <div>
-                            <div class="card-title">Console</div>
-                            <div class="card-subtitle">Terminal - Shell commands</div>
-                        </div>
-                        <div>
-                            <button class="btn btn-sm" onclick="clearConsole()">🗑️ Clear</button>
-                        </div>
+        <!-- ============================================================
+        PAGE: CONSOLE (PTY Terminal with xterm.js)
+        ============================================================ -->
+        <div class="page hidden" id="page-console">
+            <div class="card" style="padding: 0; overflow: hidden;">
+                <div class="card-header" style="padding: 16px 20px; margin: 0;">
+                    <div>
+                        <div class="card-title">Console</div>
+                        <div class="card-subtitle">PTY Terminal - Real bash shell</div>
                     </div>
-                    <div class="console-container" id="console-container">
-                        <div class="console-output" id="console-output">
-                            <div class="console-line info">Welcome to MCP Server Console</div>
-                            <div class="console-line info">Type 'help' for available commands</div>
-                            <div class="console-line info">Current directory: /data</div>
-                            <div class="console-line info">---</div>
-                        </div>
-                        <div class="console-input-line">
-                            <span class="console-prompt">$</span>
-                            <input type="text" class="console-input" id="console-input" placeholder="Enter command..." autocomplete="off" spellcheck="false">
-                            <button class="btn btn-sm btn-primary" onclick="executeConsoleCommand()">▶️ Run</button>
-                        </div>
+                    <div>
+                        <button class="btn btn-sm" onclick="resetTerminal()">🔄 Reset</button>
                     </div>
                 </div>
+                <div id="terminal" style="height: 500px; background: #000;"></div>
             </div>
+        </div>
         </div>
     </div>
 
@@ -1963,134 +1955,127 @@ You can modify this file or delete it after testing.
         });
 
         // ============================================================
-        // CONSOLE - Real Terminal with WebSocket
+        // CONSOLE - PTY Terminal with xterm.js
         // ============================================================
-        let consoleHistory = [];
-        let consoleHistoryIndex = -1;
-        let consoleWs = null;
+        let term = null;
+        let termFit = null;
+        let terminalSessionId = 'default';
+        let terminalPollInterval = null;
 
-        function connectConsole() {
-            if (consoleWs) {
-                consoleWs.close();
+        function initTerminal() {
+            if (typeof Terminal === 'undefined') {
+                console.error('xterm.js not loaded');
+                return;
             }
-            
-            const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
-            consoleWs = new WebSocket(`${protocol}//${location.host}/api/console/ws`);
-            
-            consoleWs.onopen = () => {
-                console.log('Console WebSocket connected');
-            };
-            
-            consoleWs.onmessage = (event) => {
-                const msg = JSON.parse(event.data);
-                if (msg.type === 'output') {
-                    const output = document.getElementById('console-output');
-                    const line = document.createElement('div');
-                    line.className = 'console-line';
-                    line.textContent = msg.data;
-                    output.appendChild(line);
-                    output.scrollTop = output.scrollHeight;
-                } else if (msg.error) {
-                    const output = document.getElementById('console-output');
-                    const errorLine = document.createElement('div');
-                    errorLine.className = 'console-line error';
-                    errorLine.textContent = `Error: ${msg.error}`;
-                    output.appendChild(errorLine);
-                    output.scrollTop = output.scrollHeight;
+
+            // Create terminal
+            term = new Terminal({
+                cursorBlink: true,
+                fontSize: 14,
+                fontFamily: "'JetBrains Mono', 'Fira Code', 'Consolas', monospace",
+                theme: {
+                    background: '#000000',
+                    foreground: '#e8eaed',
+                    cursor: '#00c853',
+                    selection: 'rgba(108, 92, 231, 0.3)'
                 }
-            };
-            
-            consoleWs.onclose = () => {
-                console.log('Console WebSocket closed');
-                // Reconnect after 2 seconds
-                setTimeout(connectConsole, 2000);
-            };
-            
-            consoleWs.onerror = (error) => {
-                console.error('Console WebSocket error:', error);
-            };
-        }
+            });
 
-        async function executeConsoleCommand() {
-            const input = document.getElementById('console-input');
-            const command = input.value.trim();
-            
-            if (!command) return;
-            
-            const output = document.getElementById('console-output');
-            
-            // Add to history
-            consoleHistory.push(command);
-            consoleHistoryIndex = consoleHistory.length;
-            
-            // Add command to output
-            const cmdLine = document.createElement('div');
-            cmdLine.className = 'console-line command';
-            cmdLine.textContent = `$ ${command}`;
-            output.appendChild(cmdLine);
-            
-            // Clear input
-            input.value = '';
-            
-            // Scroll to bottom
-            output.scrollTop = output.scrollHeight;
-            
-            // Send command via WebSocket
-            if (consoleWs && consoleWs.readyState === WebSocket.OPEN) {
-                consoleWs.send(JSON.stringify({
-                    type: 'command',
-                    command: command
-                }));
-            } else {
-                const errorLine = document.createElement('div');
-                errorLine.className = 'console-line error';
-                errorLine.textContent = 'Error: WebSocket not connected';
-                output.appendChild(errorLine);
-                output.scrollTop = output.scrollHeight;
-            }
-            
-            // Focus back to input
-            input.focus();
-        }
+            // Add fit addon
+            termFit = new FitAddon.FitAddon();
+            term.loadAddon(termFit);
 
-        function clearConsole() {
-            const output = document.getElementById('console-output');
-            output.innerHTML = '<div class="console-line info">Console cleared</div><div class="console-line system">---</div>';
-            consoleHistory = [];
-            consoleHistoryIndex = -1;
-        }
+            // Open terminal in DOM
+            term.open(document.getElementById('terminal'));
+            termFit.fit();
 
-        // Handle Enter key and arrow keys in console input
-        document.addEventListener('DOMContentLoaded', () => {
-            const consoleInput = document.getElementById('console-input');
-            if (consoleInput) {
-                consoleInput.addEventListener('keydown', (e) => {
-                    if (e.key === 'Enter') {
-                        e.preventDefault();
-                        executeConsoleCommand();
-                    } else if (e.key === 'ArrowUp') {
-                        e.preventDefault();
-                        // Navigate history backwards
-                        if (consoleHistoryIndex > 0) {
-                            consoleHistoryIndex--;
-                            consoleInput.value = consoleHistory[consoleHistoryIndex];
-                        }
-                    } else if (e.key === 'ArrowDown') {
-                        e.preventDefault();
-                        // Navigate history forwards
-                        if (consoleHistoryIndex < consoleHistory.length - 1) {
-                            consoleHistoryIndex++;
-                            consoleInput.value = consoleHistory[consoleHistoryIndex];
-                        } else {
-                            consoleHistoryIndex = consoleHistory.length;
-                            consoleInput.value = '';
-                        }
-                    }
+            // Handle user input
+            term.onData((data) => {
+                // Send input to terminal
+                apiPost('/api/terminal/input', {
+                    session_id: terminalSessionId,
+                    input: data
+                }).catch(err => {
+                    console.error('Terminal input error:', err);
                 });
-            }
-        });
+            });
 
-        // Connect console WebSocket when navigating to console page
+            // Handle resize
+            term.onResize((size) => {
+                apiPost('/api/terminal/resize', {
+                    session_id: terminalSessionId,
+                    cols: size.cols,
+                    rows: size.rows
+                }).catch(err => {
+                    console.error('Terminal resize error:', err);
+                });
+            });
+
+            // Start terminal session
+            startTerminal();
+        }
+
+        async function startTerminal() {
+            try {
+                const result = await apiPost('/api/terminal/start', {
+                    session_id: terminalSessionId,
+                    cols: term.cols,
+                    rows: term.rows
+                });
+
+                if (result.status === 'success') {
+                    console.log('Terminal started');
+                    // Start polling for output
+                    startTerminalPolling();
+                } else {
+                    console.error('Failed to start terminal:', result.message);
+                    term.write(`\r\n\x1b[31mError: ${result.message}\x1b[0m\r\n`);
+                }
+            } catch (e) {
+                console.error('Terminal start error:', e);
+                term.write(`\r\n\x1b[31mError: ${e.message}\x1b[0m\r\n`);
+            }
+        }
+
+        function startTerminalPolling() {
+            if (terminalPollInterval) {
+                clearInterval(terminalPollInterval);
+            }
+
+            terminalPollInterval = setInterval(async () => {
+                try {
+                    const result = await apiGet(`/api/terminal/output?session_id=${terminalSessionId}`);
+                    
+                    if (result.status === 'success' && result.output) {
+                        term.write(result.output);
+                    }
+
+                    if (!result.alive) {
+                        console.log('Terminal session ended');
+                        clearInterval(terminalPollInterval);
+                    }
+                } catch (e) {
+                    console.error('Terminal output poll error:', e);
+                }
+            }, 50); // Poll every 50ms
+        }
+
+        function resetTerminal() {
+            // Stop current session
+            apiPost('/api/terminal/stop', {
+                session_id: terminalSessionId
+            }).catch(err => {
+                console.error('Terminal stop error:', err);
+            });
+
+            // Clear terminal
+            term.clear();
+
+            // Restart
+            startTerminal();
+        }
+
+        // Initialize terminal when navigating to console page
         function navigateTo(page) {
             state.currentPage = page;
             // Update nav
@@ -2108,9 +2093,11 @@ You can modify this file or delete it after testing.
             if (page === 'tools') loadTools();
             if (page === 'config') loadConfig();
             if (page === 'keys') loadKeys();
-            // Connect console WebSocket when navigating to console
+            // Initialize terminal when navigating to console
             if (page === 'console') {
-                connectConsole();
+                if (!term) {
+                    initTerminal();
+                }
             }
             // Render existing data when navigating to logs/tool-usage
             if (page === 'logs') renderAllLogs();

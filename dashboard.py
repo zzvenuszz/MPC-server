@@ -738,6 +738,20 @@ def get_starlette_routes():
     # Logger cho Starlette routes
     logger = logging.getLogger("mcp-server")
     
+    # Import terminal module
+    try:
+        from terminal import (
+            create_terminal_session,
+            write_to_terminal,
+            read_from_terminal,
+            resize_terminal,
+            cleanup_terminal_session
+        )
+        TERMINAL_AVAILABLE = True
+    except ImportError:
+        TERMINAL_AVAILABLE = False
+        logger.warning("terminal module not available, PTY terminal disabled")
+    
     # API Routes
     async def api_auth_login(request):
         """POST /api/auth/login - Đăng nhập"""
@@ -980,109 +994,80 @@ def get_starlette_routes():
             }
         })
     
-    async def api_console_ws(websocket):
-        """WebSocket /api/console/ws - Persistent terminal session"""
-        # Check authentication via query param or cookie
-        auth_cookie = websocket.cookies.get('dashboard_auth')
-        if not auth_cookie or auth_cookie != 'authenticated':
-            await websocket.close(code=4001, reason="Unauthorized")
-            return
+    # =========================================================================
+    # Terminal API Routes (PTY-based)
+    # =========================================================================
+    if TERMINAL_AVAILABLE:
+        from config import get_settings
+        settings = get_settings()
         
-        await websocket.accept()
+        async def api_terminal_start(request):
+            """POST /api/terminal/start - Start terminal session"""
+            try:
+                data = await request.json()
+                cols = int(data.get('cols', 80))
+                rows = int(data.get('rows', 24))
+                session_id = data.get('session_id', 'default')
+                
+                result = create_terminal_session(
+                    session_id=session_id,
+                    cols=cols,
+                    rows=rows,
+                    cwd=str(settings.workspace)
+                )
+                
+                return JSONResponse(result)
+            except Exception as e:
+                logger.error(f"Terminal start error: {e}")
+                return JSONResponse({"status": "error", "message": str(e)}, status_code=500)
         
-        try:
-            from config import get_settings
-            settings = get_settings()
-            
-            if not settings.allow_shell:
-                await websocket.send_json({"error": "Shell commands are disabled"})
-                await websocket.close()
-                return
-            
-            # Create persistent shell process
-            import subprocess
-            import shlex
-            
-            # Spawn bash shell with persistent session
-            process = subprocess.Popen(
-                ['bash'],
-                stdin=subprocess.PIPE,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                cwd=str(settings.workspace),
-                shell=False,
-                text=True,
-                bufsize=1,
-                universal_newlines=True
-            )
-            
-            logger.info(f"Terminal session started, PID: {process.pid}")
-            
-            # Send welcome message
-            await websocket.send_json({
-                "type": "output",
-                "data": f"Welcome to MCP Server Console\nWorking directory: {settings.workspace}\n---\n"
-            })
-            
-            # Task to read stdout and send to websocket
-            async def read_stdout():
-                try:
-                    while True:
-                        line = process.stdout.readline()
-                        if not line:
-                            break
-                        await websocket.send_json({
-                            "type": "output",
-                            "data": line
-                        })
-                except Exception as e:
-                    logger.error(f"Error reading stdout: {e}")
-            
-            # Task to receive commands from websocket
-            async def receive_commands():
-                try:
-                    while True:
-                        message = await websocket.receive_json()
-                        if message.get('type') == 'command':
-                            command = message.get('command', '')
-                            if command:
-                                # Send command to stdin
-                                process.stdin.write(command + '\n')
-                                process.stdin.flush()
-                        elif message.get('type') == 'signal':
-                            # Handle Ctrl+C, etc.
-                            signal = message.get('signal')
-                            if signal == 'SIGINT':
-                                process.send_signal(subprocess.signal.SIGINT)
-                except Exception as e:
-                    logger.error(f"Error receiving commands: {e}")
-            
-            # Run both tasks concurrently
-            import asyncio
-            await asyncio.gather(
-                read_stdout(),
-                receive_commands(),
-                return_exceptions=True
-            )
-            
-        except Exception as e:
-            logger.error(f"Terminal session error: {e}")
+        async def api_terminal_input(request):
+            """POST /api/terminal/input - Send input to terminal"""
             try:
-                await websocket.send_json({"error": str(e)})
-            except:
-                pass
-        finally:
-            # Cleanup
+                data = await request.json()
+                session_id = data.get('session_id', 'default')
+                input_text = data.get('input', '')
+                
+                result = write_to_terminal(session_id, input_text)
+                return JSONResponse(result)
+            except Exception as e:
+                logger.error(f"Terminal input error: {e}")
+                return JSONResponse({"status": "error", "message": str(e)}, status_code=500)
+        
+        async def api_terminal_output(request):
+            """GET /api/terminal/output - Get terminal output"""
             try:
-                process.terminate()
-                process.wait(timeout=5)
-            except:
-                process.kill()
-            logger.info("Terminal session closed")
+                session_id = request.query_params.get('session_id', 'default')
+                result = read_from_terminal(session_id)
+                return JSONResponse(result)
+            except Exception as e:
+                logger.error(f"Terminal output error: {e}")
+                return JSONResponse({"status": "error", "message": str(e), "output": "", "alive": False})
+        
+        async def api_terminal_resize(request):
+            """POST /api/terminal/resize - Resize terminal"""
             try:
-                await websocket.close()
-            except:
-                pass
+                data = await request.json()
+                session_id = data.get('session_id', 'default')
+                cols = int(data.get('cols', 80))
+                rows = int(data.get('rows', 24))
+                
+                result = resize_terminal(session_id, cols, rows)
+                return JSONResponse(result)
+            except Exception as e:
+                logger.error(f"Terminal resize error: {e}")
+                return JSONResponse({"status": "error", "message": str(e)}, status_code=500)
+        
+        async def api_terminal_stop(request):
+            """POST /api/terminal/stop - Stop terminal session"""
+            try:
+                data = await request.json()
+                session_id = data.get('session_id', 'default')
+                cleanup_terminal_session(session_id)
+                return JSONResponse({"status": "success"})
+            except Exception as e:
+                logger.error(f"Terminal stop error: {e}")
+                return JSONResponse({"status": "error", "message": str(e)}, status_code=500)
     
     async def dashboard_index(request):
         """Serve dashboard index.html"""
@@ -1109,6 +1094,12 @@ def get_starlette_routes():
         Route("/api/keys", api_keys_update, methods=["POST"]),
         Route("/api/status", api_server_status, methods=["GET"]),
         WebSocketRoute("/api/console/ws", api_console_ws),
+        # Terminal routes (PTY-based)
+        Route("/api/terminal/start", api_terminal_start, methods=["POST"]),
+        Route("/api/terminal/input", api_terminal_input, methods=["POST"]),
+        Route("/api/terminal/output", api_terminal_output, methods=["GET"]),
+        Route("/api/terminal/resize", api_terminal_resize, methods=["POST"]),
+        Route("/api/terminal/stop", api_terminal_stop, methods=["POST"]),
         Mount("/static", app=StaticFiles(directory=str(Path(__file__).parent / "dashboard_static")), name="dashboard-static"),
     ])
     
