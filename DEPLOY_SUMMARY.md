@@ -30,6 +30,8 @@
   - Tích hợp REST API endpoints: `/api/terminal/*`
   - Frontend sử dụng xterm.js cho terminal emulation
   - Real bash shell với đầy đủ tính năng (Ctrl+C, persistent session)
+  - **Chạy với user `ubuntu`** (setuid/setgid)
+  - Working directory: `/tmp/mcp-workspace`
 
 ### 5. Workspace Path cho Hugging Face ✅
 **File**: `config.py`
