@@ -1,5 +1,5 @@
 ---
-title: MPC Server
+title: MPC Server!
 emoji: 💥
 colorFrom: indigo
 colorTo: gray
